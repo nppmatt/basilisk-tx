@@ -1,19 +1,12 @@
-#!/bin/bash
+#!/bin/bash -l
 
-echo "Loading binutils"
-module load binutils
-echo "Loading easybuild"
-module load easybuild
-echo "Loading Bison"
-module load Bison
-echo "Loading libunwind"
-module load libunwind
-echo "Loading FFmpeg"
-module load FFmpeg
-echo "Loading GCC"
-module load GCC
-echo "Loading OpenMPI"
-module load OpenMPI
-echo "Loading Mesa"
-module load Mesa
+echo "Loading easybuild, site, slurm/wulver"
+module load easybuild site slurm/wulver
 
+echo "Loading GCCcore, binutils, Bison"
+module load GCCcore binutils Bison
+
+echo "Loading GCC libunwind FFmpeg OpenMPI Mesa"
+module load GCC libunwind FFmpeg OpenMPI Mesa
+
+module list
