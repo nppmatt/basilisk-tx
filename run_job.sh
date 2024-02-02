@@ -6,7 +6,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
+#SBATCH --account=2024-spri+
 #SBATCH --partition=general
+#SBATCH --qos=low
 
 echo "test"
 
