@@ -11,9 +11,8 @@
 #SBATCH --qos=low
 #SBATCH --time=00:10:00
 
-echo "test"
-
 # Load all needed modules for Basilisk
+echo "Loading modules."
 module purge > /dev/null 2>&1
 source load_modules.sh
 echo "Modules loaded."
