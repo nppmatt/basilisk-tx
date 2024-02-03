@@ -1,4 +1,4 @@
-#!/bin/bash -l
+#!/bin/bash
 
 OUT_DIR=out
 options=( "$OUT_DIR"/* )
