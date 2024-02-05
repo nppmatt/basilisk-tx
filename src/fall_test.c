@@ -88,7 +88,7 @@ event viewing (i += 10) {
     squares ("u.y", linear = true);
     box (notics = true);
   }
-  save ("movie.mp4");
+  save ("movie/movie.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);

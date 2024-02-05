@@ -22,7 +22,7 @@ u.n[right] = neumann(0);
 p[right] = dirichlet(0);
 u.t[left] = dirichlet(0);
 tau_qq[left] = dirichlet(0);
-f[left] = 0.0;
+f[left] = neumann(0);
 
 int main() {
 	size(2.6);
@@ -45,7 +45,7 @@ event init (t = 0) {
 	fraction(f, -sq(x - 2.0) - sq(y) + sq(0.5));
 
 	foreach()
-		u.x[] = -f[] * 2.0;
+		u.x[] = -f[];
 }
 
 event acceleration (i++) {
@@ -88,7 +88,7 @@ event viewing (i += 10) {
     squares ("u.y", linear = true);
     box (notics = true);
   }
-  save ("movie/movie2.mp4");
+  save ("movie/wetting_movie.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);
