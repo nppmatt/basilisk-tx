@@ -6,7 +6,6 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --account=2024-spring-math-453-misieg-mc462
 #SBATCH --partition=general
 #SBATCH --qos=low
 #SBATCH --time=00:10:00

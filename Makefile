@@ -15,7 +15,12 @@ fall_test: $(SRC_DIR)/fall_test.c
 	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
 	@echo "Finished!"
 
-all: fall_test
+fall_test2: $(SRC_DIR)/fall_test2.c
+	$(LMOD); wait && \
+	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
+	@echo "Finished!"
+
+all: fall_test fall_test2
 
 .PHONY: clean
 clean:
