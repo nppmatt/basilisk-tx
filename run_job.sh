@@ -1,8 +1,6 @@
 #!/bin/bash
 
 #SBATCH -J basilisk_job
-#SBATCH -o out/slurm.out
-#SBATCH -e out/slurm.err
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8

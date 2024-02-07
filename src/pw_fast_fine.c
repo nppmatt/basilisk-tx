@@ -45,7 +45,7 @@ event init (t = 0) {
 	fraction(f, -sq(x - 2.0) - sq(y) + sq(0.5));
 
 	foreach()
-		u.x[] = -f[];
+		u.x[] = -f[] * 2.0;
 }
 
 event acceleration (i++) {
@@ -63,7 +63,7 @@ event properties (i++) {
 
 #if TREE
 event adapt (i++) {
-	adapt_wavelet ({f, u.x, u.y}, (double[]){1e-2, 5e-3, 5e-3},
+	adapt_wavelet ({f, u.x, u.y}, (double[]){1e-3, 1e-4, 1e-4},
 			maxlevel = LEVEL, minlevel = LEVEL - 2);
 }
 #endif
@@ -88,7 +88,7 @@ event viewing (i += 10) {
     squares ("u.y", linear = true);
     box (notics = true);
   }
-  save ("movie/wetting_movie.mp4");
+  save ("movie/wetting_movie_fast_fine.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);

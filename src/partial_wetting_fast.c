@@ -51,7 +51,7 @@ event init (t = 0) {
 event acceleration (i++) {
 	face vector av = a;
 	foreach_face(x)
-		av.x[] -= 1.0 / sq(FR);
+		av.x[] -= 0.0 / sq(FR);
 }
 
 event properties (i++) {
