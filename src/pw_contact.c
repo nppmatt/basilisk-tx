@@ -1,12 +1,16 @@
-/* http://basilisk.fr/src/test/fall.c */
+/* Modification of pw_fast_fine.c to include contact angle dynamics.
+ * Chosen because its the most interesting case at this point (2023/02/07).
+ */
 
 #include "axi.h"
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "log-conform.h"
 #include "curvature.h"
-
 #include "view.h"
+
+#include "contact.h"
+#include "vof.h"
 
 #define RHO_r 0.001
 #define MU_r 0.001
@@ -22,11 +26,20 @@ u.n[right] = neumann(0);
 p[right] = dirichlet(0);
 u.t[left] = dirichlet(0);
 tau_qq[left] = dirichlet(0);
+
+/* Removed to test contact angle dynamics.
 f[left] = neumann(0);
+*/
+
+// scalar f[];
+vector h[];
+h.t[left] = contact_angle(45.0 * pi / 180.0);
 
 int main() {
 	size(2.6);
 	init_grid(1 << LEVEL);
+
+	//f.height = h;
 
 	rho1 = 1.0;
 	rho2 = RHO_r;
@@ -65,7 +78,6 @@ event properties (i++) {
 event adapt (i++) {
 	adapt_wavelet ({f, u.x, u.y}, (double[]){1e-2, 5e-3, 5e-3},
 			maxlevel = LEVEL, minlevel = LEVEL - 2);
-}
 #endif
 
 event logfile (i += 20; t <= 5) {
@@ -73,7 +85,6 @@ event logfile (i += 20; t <= 5) {
 	position (f, pos, {0,1});
 	fprintf(stderr, "%g %g\n", t, 2.0 * statsf(pos).max);
 }
-
 
 event viewing (i += 10) {
   view (width = 400, height = 400, fov = 20, ty = -0.5,
@@ -88,12 +99,10 @@ event viewing (i += 10) {
     squares ("u.y", linear = true);
     box (notics = true);
   }
-  save ("movie/wetting_movie_fast_fine.mp4");
+  save ("movie/pw_contact.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);
 #endif
 }
-
-/* http://basilisk.fr/src/test/fall.c */
 

@@ -12,7 +12,7 @@
 #define MU_r 0.001
 #define RE 5.0
 #define FR 2.26
-#define LEVEL 7
+#define LEVEL 9
 
 #define BETA 0.1
 #define WI 1.0 // Weissenberg number
@@ -63,7 +63,7 @@ event properties (i++) {
 
 #if TREE
 event adapt (i++) {
-	adapt_wavelet ({f, u.x, u.y}, (double[]){1e-3, 1e-4, 1e-4},
+	adapt_wavelet ({f, u.x, u.y}, (double[]){1e-2, 5e-3, 5e-3},
 			maxlevel = LEVEL, minlevel = LEVEL - 2);
 }
 #endif

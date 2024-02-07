@@ -40,7 +40,16 @@ pw_fast_fine: $(SRC_DIR)/pw_fast_fine.c
 	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
 	@echo "Finished!"
 
+pw_contact: $(SRC_DIR)/pw_contact.c
+	$(LMOD); wait && \
+	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
+	@echo "Finished!"
+
 all: fall_test fall_test2 partial_wetting partial_wetting_fast pw_fine pw_fast_fine
+
+case_fine: pw_fine pw_fast_fine
+
+contact: pw_contact
 
 .PHONY: clean
 clean:
