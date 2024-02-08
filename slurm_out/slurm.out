@@ -1,12 +1,8 @@
 Loading modules.
-Loading modules.
-Loading easybuild, site, slurm/wulver
 Loading easybuild, site, slurm/wulver
 Loading GCCcore, binutils, Bison
-Loading GCCcore, binutils, Bison
-Loading GCC libunwind FFmpeg OpenMPI Mesa
 Loading GCC libunwind FFmpeg OpenMPI Mesa
 Modules loaded.
-Passing out/pw_fine
-Modules loaded.
-Passing out/pw_fast_fine
+Passing out/pw_contact
+
+# Quadtree, 4628 steps, 461.964 CPU, 444.4 real, 6.6e+04 points.step/s, 35 var

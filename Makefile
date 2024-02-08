@@ -47,7 +47,7 @@ pw_contact: $(SRC_DIR)/pw_contact.c
 
 all: fall_test fall_test2 partial_wetting partial_wetting_fast pw_fine pw_fast_fine
 
-case_fine: pw_fine pw_fast_fine
+fine_mesh: pw_fine pw_fast_fine
 
 contact: pw_contact
 

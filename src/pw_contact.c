@@ -1,6 +1,4 @@
-/* Modification of pw_fast_fine.c to include contact angle dynamics.
- * Chosen because its the most interesting case at this point (2023/02/07).
- */
+/* Adapted from pw_fast_fine variant */
 
 #include "axi.h"
 #include "navier-stokes/centered.h"
@@ -16,7 +14,7 @@
 #define MU_r 0.001
 #define RE 5.0
 #define FR 2.26
-#define LEVEL 9
+#define LEVEL 8
 
 #define BETA 0.1
 #define WI 1.0 // Weissenberg number
@@ -27,19 +25,16 @@ p[right] = dirichlet(0);
 u.t[left] = dirichlet(0);
 tau_qq[left] = dirichlet(0);
 
-/* Removed to test contact angle dynamics.
-f[left] = neumann(0);
-*/
+/* Remove in lieu of "h" */
+//f[left] = neumann(0);
 
-// scalar f[];
+//scalar f[];
 vector h[];
 h.t[left] = contact_angle(45.0 * pi / 180.0);
 
 int main() {
 	size(2.6);
 	init_grid(1 << LEVEL);
-
-	//f.height = h;
 
 	rho1 = 1.0;
 	rho2 = RHO_r;
@@ -49,6 +44,9 @@ int main() {
 	mup = mupv;
 	lambda = lambdav;
 	DT = 2e-3;
+
+	/* Contact angle constants */
+	f.height = h;
 	run();
 }
 
@@ -78,6 +76,7 @@ event properties (i++) {
 event adapt (i++) {
 	adapt_wavelet ({f, u.x, u.y}, (double[]){1e-2, 5e-3, 5e-3},
 			maxlevel = LEVEL, minlevel = LEVEL - 2);
+}
 #endif
 
 event logfile (i += 20; t <= 5) {
@@ -85,6 +84,7 @@ event logfile (i += 20; t <= 5) {
 	position (f, pos, {0,1});
 	fprintf(stderr, "%g %g\n", t, 2.0 * statsf(pos).max);
 }
+
 
 event viewing (i += 10) {
   view (width = 400, height = 400, fov = 20, ty = -0.5,

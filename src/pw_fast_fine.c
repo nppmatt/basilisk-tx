@@ -12,7 +12,7 @@
 #define MU_r 0.001
 #define RE 5.0
 #define FR 2.26
-#define LEVEL 9
+#define LEVEL 8
 
 #define BETA 0.1
 #define WI 1.0 // Weissenberg number
