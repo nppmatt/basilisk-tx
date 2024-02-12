@@ -5,4 +5,4 @@ Loading GCC libunwind FFmpeg OpenMPI Mesa
 Modules loaded.
 Passing out/pw_contact
 
-# Quadtree, 2540 steps, 67.8549 CPU, 60.2 real, 1e+05 points.step/s, 35 var
+# Quadtree, 4628 steps, 461.778 CPU, 445.3 real, 6.59e+04 points.step/s, 35 var

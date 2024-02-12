@@ -1,4 +1,4 @@
-/* Adapted from pw_fast_fine variant */
+/* pw_contact -> viscosity_test */
 
 #include "axi.h"
 #include "navier-stokes/centered.h"
@@ -86,7 +86,7 @@ event logfile (i += 20; t <= 5) {
 }
 
 
-event viewing (i += 10) {
+event viewing (i += 5) {
   view (width = 400, height = 400, fov = 20, ty = -0.5,
 	quat = {0, 0, -0.707, 0.707});
 
@@ -99,7 +99,7 @@ event viewing (i += 10) {
     squares ("u.y", linear = true);
     box (notics = true);
   }
-  save ("movie/pw_contact.mp4");
+  save ("movie/viscosity_test.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);
