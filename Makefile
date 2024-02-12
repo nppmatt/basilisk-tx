@@ -45,11 +45,18 @@ pw_contact: $(SRC_DIR)/pw_contact.c
 	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
 	@echo "Finished!"
 
+tension_test: $(SRC_DIR)/tension_test.c
+	$(LMOD); wait && \
+	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
+	@echo "Finished!"
+
 all: fall_test fall_test2 partial_wetting partial_wetting_fast pw_fine pw_fast_fine
 
 fine_mesh: pw_fine pw_fast_fine
 
 contact: pw_contact
+
+tension: tension_test
 
 .PHONY: clean
 clean:

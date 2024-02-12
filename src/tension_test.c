@@ -1,4 +1,4 @@
-/* pw_contact -> viscosity_test */
+/* Adapted from pw_fast_fine variant */
 
 #include "axi.h"
 #include "navier-stokes/centered.h"
@@ -6,9 +6,10 @@
 #include "log-conform.h"
 #include "curvature.h"
 #include "view.h"
-
 #include "contact.h"
 #include "vof.h"
+
+#include "tension.h"
 
 #define RHO_r 0.001
 #define MU_r 0.001
@@ -25,12 +26,10 @@ p[right] = dirichlet(0);
 u.t[left] = dirichlet(0);
 tau_qq[left] = dirichlet(0);
 
-/* Remove in lieu of "h" */
-//f[left] = neumann(0);
-
-//scalar f[];
 vector h[];
 h.t[left] = contact_angle(30.0 * pi / 180.0);
+
+scalar sigma[] =  1.96;
 
 int main() {
 	size(2.6);
@@ -59,11 +58,13 @@ event init (t = 0) {
 		u.x[] = -f[] * 2.0;
 }
 
+/*
 event acceleration (i++) {
 	face vector av = a;
 	foreach_face(x)
 		av.x[] -= 0.0 / sq(FR);
 }
+*/
 
 event properties (i++) {
 	foreach() {
@@ -86,7 +87,7 @@ event logfile (i += 20; t <= 5) {
 }
 
 
-event viewing (i += 5) {
+event viewing (i += 10) {
   view (width = 400, height = 400, fov = 20, ty = -0.5,
 	quat = {0, 0, -0.707, 0.707});
 
@@ -99,7 +100,7 @@ event viewing (i += 5) {
     squares ("u.y", linear = true);
     box (notics = true);
   }
-  save ("movie/viscosity_test.mp4");
+  save ("movie/pw_contact.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);
