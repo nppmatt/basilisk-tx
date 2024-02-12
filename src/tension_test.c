@@ -21,14 +21,18 @@
 #define WI 1.0 // Weissenberg number
 
 scalar lambdav[], mupv[];
-u.n[right] = neumann(0);
 p[right] = dirichlet(0);
 u.t[left] = dirichlet(0);
 tau_qq[left] = dirichlet(0);
 
-vector h[];
-h.t[left] = contact_angle(30.0 * pi / 180.0);
+/* "Wetting" BC */
+u.n[right] = neumann(0);
 
+/* Contact angle specification */
+vector h[];
+h.t[left] = contact_angle(90.0 * pi / 180.0);
+
+/* Surface tension energy */
 scalar sigma[] =  3.0;
 
 int main() {
