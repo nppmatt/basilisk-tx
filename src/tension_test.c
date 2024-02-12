@@ -104,7 +104,7 @@ event viewing (i += 10) {
     squares ("u.y", linear = true);
     box (notics = true);
   }
-  save ("movie/tension_test.mp4");
+  save ("movie/tension_test_90.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);
