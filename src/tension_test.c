@@ -11,8 +11,8 @@
 
 #include "tension.h"
 
-#define RHO_r 0.001
-#define MU_r 0.001
+#define RHO_r 0.1
+#define MU_r 0.1
 #define RE 5.0
 #define FR 2.26
 #define LEVEL 8
@@ -29,7 +29,7 @@ tau_qq[left] = dirichlet(0);
 vector h[];
 h.t[left] = contact_angle(30.0 * pi / 180.0);
 
-scalar sigma[] =  1.96;
+scalar sigma[] =  3;
 
 int main() {
 	size(2.6);
