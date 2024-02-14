@@ -24,7 +24,9 @@ scalar lambdav[], mupv[];
 p[top] = dirichlet(0);
 u.t[bottom] = dirichlet(0);
 
+/*
 tau_qq[bottom] = dirichlet(0);
+*/
 
 /* "Wetting" BC */
 u.n[bottom] = neumann(0);
