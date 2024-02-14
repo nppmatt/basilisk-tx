@@ -24,10 +24,8 @@ scalar lambdav[], mupv[];
 p[top] = dirichlet(0);
 u.t[bottom] = dirichlet(0);
 
-/*
-scalar taq_qq[];
+scalar tau_qq[];
 tau_qq[bottom] = dirichlet(0);
-*/
 
 /* "Wetting" BC */
 u.n[bottom] = neumann(0);
@@ -99,7 +97,7 @@ event logfile (i += 20; t <= 5) {
 }
 
 
-event viewing (i += 10) {
+event viewing (i += 5) {
   view (width = 400, height = 400, fov = 20, ty = -0.5,
 	quat = {0, 0, -0.707, 0.707});
 
@@ -107,11 +105,13 @@ event viewing (i += 10) {
   draw_vof ("f", lw = 2);
   squares ("u.x", linear = true);
   box (notics = true);
+  /*
   mirror ({0,1}) {
     draw_vof ("f", lw = 2);
     squares ("u.y", linear = true);
     box (notics = true);
   }
+  */
 
   save ("movie/tension_test_30.mp4");
 #if 0
