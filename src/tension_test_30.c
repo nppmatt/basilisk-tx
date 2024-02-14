@@ -1,6 +1,6 @@
 /* Adapted from pw_fast_fine variant */
 
-#include "axi.h"
+/* #include "axi.h" */
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "log-conform.h"
@@ -21,16 +21,19 @@
 #define WI 1.0 // Weissenberg number
 
 scalar lambdav[], mupv[];
-p[right] = dirichlet(0);
-u.t[left] = dirichlet(0);
-tau_qq[left] = dirichlet(0);
+p[top] = dirichlet(0);
+u.t[bottom] = dirichlet(0);
+//tau_qq[bottom] = dirichlet(0);
 
 /* "Wetting" BC */
-u.n[right] = neumann(0);
+u.n[bottom] = neumann(0);
 
-/* Contact angle specification */
+/* Contact angle specification (removed axial symmetry) */
 vector h[];
-h.t[left] = contact_angle(90.0 * pi / 180.0);
+double theta0 = 30.0;
+
+//h.t[left] = contact_angle(theta0 * pi / 180.0);
+h.t[bottom] = contact_angle(theta0 * pi / 180.0);
 
 /* Surface tension energy */
 scalar sigma[] =  3.0;
@@ -48,14 +51,15 @@ int main() {
 	lambda = lambdav;
 	DT = 2e-3;
 
-	/* Contact angle constants */
+	/* Contact angle height fcn field applied to VOF */
 	f.height = h;
 	run();
 }
 
 event init (t = 0) {
-	scalar s = tau_p.x.x;
-	s[left] = dirichlet(0.0);
+	//scalar s = tau_p.x.x;
+	scalar s[];
+	s[bottom] = dirichlet(0.0);
 	fraction(f, -sq(x - 2.0) - sq(y) + sq(0.5));
 
 	foreach()
@@ -104,7 +108,8 @@ event viewing (i += 10) {
     squares ("u.y", linear = true);
     box (notics = true);
   }
-  save ("movie/tension_test_90.mp4");
+
+  save ("movie/tension_test_30.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);
