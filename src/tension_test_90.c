@@ -41,7 +41,7 @@ h.t[bottom] = contact_angle(theta0 * pi / 180.0);
 scalar sigma[] =  3.0;
 
 int main() {
-	size(2.6);
+	size(3.2);
 	init_grid(1 << LEVEL);
 
 	rho1 = 1.0;
@@ -59,14 +59,14 @@ int main() {
 }
 
 event init (t = 0) {
-	//scalar s = tau_p.x.x;
+	/* Viscoelastic stress tensor at wall with normal y. Currently will not compile. */
+	//scalar s = tau_p.y.y;
 	scalar s[];
 	s[bottom] = dirichlet(0.0);
-	//fraction(f, -sq(x - 2.0) - sq(y) + sq(0.5));
-	fraction( f, -(sq(x) + sq(y-2.0) - sq(0.5)) );
+	fraction(f, -sq(x - 1.6) - sq(y - 2.0) + sq(0.5));
 
 	foreach()
-		u.x[] = -f[] * 2.0;
+		u.y[] = -f[] * 2.0;
 }
 
 /*
@@ -98,7 +98,7 @@ event logfile (i += 20; t <= 5) {
 }
 
 
-event viewing (i += 5) {
+event viewing (i += 10) {
   view (width = 640, height = 640, fov = 20, ty = -0.5,
 	quat = {0, 0, -0.707, 0.707});
 
