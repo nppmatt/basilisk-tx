@@ -16,7 +16,6 @@
 #define RE 5.0
 #define FR 2.26
 #define LEVEL 8
-
 #define BETA 0.1
 #define WI 1.0 // Weissenberg number
 
@@ -92,15 +91,15 @@ event adapt (i++) {
 #endif
 
 /* Logging spread diameter */
-event logfile (i += 20; t <= 5) {
+event logfile (i += 20; t <= 8) {
 	scalar pos[];
 	position (f, pos, {0,1});
 	fprintf(stderr, "%g %g\n", t, 2.0 * statsf(pos).max);
 }
 
 event viewing (i += 10) {
-  view (width = 1024, height = 1024, fov = 30, ty = -0.5,
-	quat = {0, 0, -0.707, 0.707});
+  view (width = 1024, height = 1024, fov = 20, ty = -0.5,
+	quat = {0, 0, -0.707, 0});
 
   clear();
   draw_vof ("f", lw = 2);

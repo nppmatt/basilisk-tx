@@ -4,8 +4,8 @@
 #SBATCH -o slurm_out/slurm.out
 #SBATCH -e slurm_out/slurm.err
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --ntasks-per-node=16
+#SBATCH --threads-per-core=1
 #SBATCH --partition=general
 #SBATCH --qos=low
 #SBATCH --time=00:30:00
@@ -18,4 +18,4 @@ echo "Modules loaded."
 
 # Run the file passed onto these parameters.
 echo "Passing $1"
-./"$1"
+mpirun -n $SLURM_NTASKS ./"$1"

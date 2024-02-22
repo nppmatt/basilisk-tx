@@ -1,5 +1,8 @@
 CC=qcc
 CFLAGS=-O2 -std=c99 -Wall -D_XOPEN_SOURCE=700
+MPIGEN=-source -D_MPI=1
+MPICC=mpicc
+MPIFLAGS=-O2 -std=c99 -Wall -D_MPI=1
 LINKFLAGS=-lfb_osmesa -lOSMesa -lm
 
 .PHONY: source
