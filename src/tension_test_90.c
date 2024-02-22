@@ -91,16 +91,20 @@ event adapt (i++) {
 }
 #endif
 
+/* Logging spread diameter
 event logfile (i += 20; t <= 5) {
 	scalar pos[];
 	position (f, pos, {0,1});
 	fprintf(stderr, "%g %g\n", t, 2.0 * statsf(pos).max);
 }
-
+*/
 
 event viewing (i += 10) {
+  /*view (width = 640, height = 640, fov = 20, ty = -0.5,
+	quat = {0, 0, -0.707, 0.707});*/
+
   view (width = 640, height = 640, fov = 20, ty = -0.5,
-	quat = {0, 0, -0.707, 0.707});
+	quat = {0, 0, 0, 0});
 
   clear();
   draw_vof ("f", lw = 2);
