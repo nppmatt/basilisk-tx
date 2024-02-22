@@ -99,12 +99,12 @@ event logfile (i += 20; t <= 5) {
 }
 
 event viewing (i += 10) {
-  view (width = 640, height = 640, fov = 20, ty = -0.5,
+  view (width = 1024, height = 1024, fov = 30, ty = -0.5,
 	quat = {0, 0, -0.707, 0.707});
 
   clear();
   draw_vof ("f", lw = 2);
-  squares ("u.x", linear = true);
+  squares ("u.y", linear = true);
   box (notics = true);
   /*
   mirror ({0,1}) {

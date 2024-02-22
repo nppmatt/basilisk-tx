@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --partition=general
 #SBATCH --qos=low
-#SBATCH --time=00:20:00
+#SBATCH --time=00:30:00
 
 # Load all needed modules for Basilisk
 echo "Loading modules."
