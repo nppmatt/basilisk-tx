@@ -99,11 +99,8 @@ event logfile (i += 20; t <= 5) {
 }
 
 event viewing (i += 10) {
-  /*view (width = 640, height = 640, fov = 20, ty = -0.5,
-	quat = {0, 0, -0.707, 0.707});*/
-
   view (width = 640, height = 640, fov = 20, ty = -0.5,
-	quat = {0, 0, 0, 0});
+	quat = {0, 0, -0.707, 0.707});
 
   clear();
   draw_vof ("f", lw = 2);
