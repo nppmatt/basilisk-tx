@@ -98,7 +98,7 @@ event logfile (i += 20; t <= 8) {
 
 /* Refer to draw.h documentation. */
 event viewing (i += 10) {
-  view (width = 1024, height = 1024, fov = 20, ty = 0.0,
+  view (width = 1024, height = 1024, fov = 20, tx = 1.6, ty = 1.6,
 	quat = {0, 0, 0, 0});
 
   clear();
