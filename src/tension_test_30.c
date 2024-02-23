@@ -96,7 +96,9 @@ event logfile (i += 20; t <= 8) {
 	fprintf(stderr, "%g %g\n", t, 2.0 * statsf(pos).max);
 }
 
-/* Refer to draw.h documentation. */
+/* Refer to draw.h documentation. 
+ * tx/ty are fractional and direction is negative.
+ * */
 event viewing (i += 10) {
   view (width = 1024, height = 1024, fov = 20, tx = -0.5, ty = -0.5,
 	quat = {0, 0, 0, 0});
