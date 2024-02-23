@@ -20,20 +20,19 @@
 #define WI 1.0 // Weissenberg number
 
 scalar lambdav[], mupv[];
+u.n[top] = neumann(0);
 p[top] = dirichlet(0);
-u.t[bottom] = dirichlet(0);
 
+/* Revert to non-wetting condition as in original fall test. */
 scalar tau_qq[];
 tau_qq[bottom] = dirichlet(0);
+u.t[bottom] = dirichlet(0);
+f[bottom] = 0.0;
 
-/* "Wetting" BC */
-u.n[bottom] = neumann(0);
 
 /* Contact angle specification (removed axial symmetry) */
 vector h[];
 double theta0 = 30.0;
-
-//h.t[left] = contact_angle(theta0 * pi / 180.0);
 h.t[bottom] = contact_angle(theta0 * pi / 180.0);
 
 /* Surface tension energy */
@@ -97,8 +96,9 @@ event logfile (i += 20; t <= 8) {
 	fprintf(stderr, "%g %g\n", t, 2.0 * statsf(pos).max);
 }
 
+/* Refer to draw.h documentation. */
 event viewing (i += 10) {
-  view (width = 1024, height = 1024, fov = 20, ty = -0.5,
+  view (width = 1024, height = 1024, fov = 20, ty = 0.0,
 	quat = {0, 0, 0, 0});
 
   clear();
