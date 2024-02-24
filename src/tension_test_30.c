@@ -23,11 +23,12 @@ scalar lambdav[], mupv[];
 u.n[top] = neumann(0);
 p[top] = dirichlet(0);
 
-/* Revert to non-wetting condition as in original fall test. */
 scalar tau_qq[];
 tau_qq[bottom] = dirichlet(0);
 u.t[bottom] = dirichlet(0);
-f[bottom] = 0.0;
+
+/* The so-called "wetting condition", which is the fraction of fluid enforced by VoF method. */
+f[bottom] = 1.0;
 
 
 /* Contact angle specification (removed axial symmetry) */
@@ -57,9 +58,8 @@ int main() {
 }
 
 event init (t = 0) {
-	/* Viscoelastic stress tensor at wall with normal y. Currently will not compile. */
+	/* Viscoelastic stress tensor at wall with normal y. */
 	scalar s = tau_p.y.y;
-	//scalar s[];
 	s[bottom] = dirichlet(0.0);
 	fraction(f, -sq(x - 1.6) - sq(y - 2.0) + sq(0.5));
 
