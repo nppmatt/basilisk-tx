@@ -58,8 +58,8 @@ int main() {
 
 event init (t = 0) {
 	/* Viscoelastic stress tensor at wall with normal y. Currently will not compile. */
-	//scalar s = tau_p.y.y;
-	scalar s[];
+	scalar s = tau_p.y.y;
+	//scalar s[];
 	s[bottom] = dirichlet(0.0);
 	fraction(f, -sq(x - 1.6) - sq(y - 2.0) + sq(0.5));
 
