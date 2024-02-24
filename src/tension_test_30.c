@@ -28,7 +28,8 @@ tau_qq[bottom] = dirichlet(0);
 u.t[bottom] = dirichlet(0);
 
 /* The so-called "wetting condition", which is the fraction of fluid enforced by VoF method. */
-f[bottom] = 0.0;
+//f[bottom] = 0.0;
+f[bottom] = neumann(0);
 
 
 /* Contact angle specification (removed axial symmetry) */
