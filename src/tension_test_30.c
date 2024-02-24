@@ -90,7 +90,7 @@ event adapt (i++) {
 #endif
 
 /* Logging spread diameter */
-event logfile (i += 20; t <= 8) {
+event logfile (i += 20; t <= 10) {
 	scalar pos[];
 	position (f, pos, {0,1});
 	fprintf(stderr, "%g %g\n", t, 2.0 * statsf(pos).max);

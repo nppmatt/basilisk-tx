@@ -8,7 +8,7 @@
 #SBATCH --threads-per-core=1
 #SBATCH --partition=general
 #SBATCH --qos=low
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 
 # Load all needed modules for Basilisk
 echo "Loading modules."
@@ -18,4 +18,5 @@ echo "Modules loaded."
 
 # Run the file passed onto these parameters.
 echo "Passing $1"
-mpirun -n $SLURM_NTASKS ./"$1"
+./"$1"
+#mpirun -n $SLURM_NTASKS ./"$1"
