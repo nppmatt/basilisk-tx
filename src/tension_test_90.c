@@ -34,7 +34,7 @@ u.t[bottom] = dirichlet(0);
 
 /* Contact angle specification (removed axial symmetry) */
 vector h[];
-double theta0 = 30.0;
+double theta0 = 90.0;
 h.t[bottom] = contact_angle(theta0 * pi / 180.0);
 
 /* Surface tension energy */
@@ -116,7 +116,7 @@ event viewing (i += 10) {
   }
   */
 
-  save ("movie/tension_test_30.mp4");
+  save ("movie/tension_test_90.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);
