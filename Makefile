@@ -1,5 +1,5 @@
 CC=qcc
-CFLAGS=-O2 -fopenmp -std=c99 -Wall -D_XOPEN_SOURCE=700
+CFLAGS=-O2 -std=c99 -Wall -D_XOPEN_SOURCE=700
 MPIGEN=-source -D_MPI=1
 MPICC=mpicc
 MPIFLAGS=-O2 -std=c99 -Wall -D_MPI=1
