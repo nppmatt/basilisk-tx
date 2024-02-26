@@ -29,6 +29,7 @@ u.t[bottom] = dirichlet(0);
 
 /* The so-called "wetting condition"(?), which is the fraction of fluid enforced by VoF method. */
 //f[bottom] = 1.0;
+/* Removed in order to be able to specify contact angle. */
 //f[bottom] = neumann(0);
 
 
@@ -37,8 +38,8 @@ vector h[];
 double theta0 = 90.0;
 h.t[bottom] = contact_angle(theta0 * pi / 180.0);
 
-/* Surface tension energy */
-scalar sigma[] =  3.0;
+/* Surface tension energy (set directly in main for now) */
+//scalar sigma[] =  3.0;
 
 int main() {
 	size(3.2);
@@ -48,6 +49,7 @@ int main() {
 	rho2 = RHO_r;
 	mu1 = BETA / RE;
 	mu2 = MU_r / RE;
+	f.sigma = 1.0;
 
 	mup = mupv;
 	lambda = lambdav;
@@ -101,7 +103,7 @@ event logfile (i += 20; t <= 10) {
  * tx/ty are fractional and direction is negative.
  * */
 event viewing (i += 10) {
-  view (width = 1024, height = 1024, fov = 20, tx = -0.5, ty = -0.5,
+  view (width = 640, height = 640, fov = 20, tx = -0.5, ty = -0.5,
 	quat = {0, 0, 0, 0});
 
   clear();
