@@ -4,7 +4,3 @@ Loading GCCcore, binutils, Bison
 Loading GCC libunwind FFmpeg OpenMPI Mesa intel
 Modules loaded.
 Passing out/tension_test_90
-
-# Quadtree, 28575 steps, 1117.99 CPU, 841.6 real, 2.48e+05 points.step/s, 32 var
-
-# Quadtree, 28575 steps, 1122.29 CPU, 846.2 real, 2.47e+05 points.step/s, 32 var

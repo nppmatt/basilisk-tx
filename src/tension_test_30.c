@@ -49,7 +49,7 @@ int main() {
 	rho2 = RHO_r;
 	mu1 = BETA / RE;
 	mu2 = MU_r / RE;
-	f.sigma = 1.0;
+	f.sigma = 3.0;
 
 	mup = mupv;
 	lambda = lambdav;
