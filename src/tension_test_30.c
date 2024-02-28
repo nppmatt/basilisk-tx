@@ -1,6 +1,3 @@
-/* Adapted from pw_fast_fine variant */
-
-/* #include "axi.h" */
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "log-conform.h"
@@ -8,11 +5,10 @@
 #include "view.h"
 #include "contact.h"
 #include "vof.h"
-
 #include "tension.h"
 
-#define RHO_r 0.01
-#define MU_r 0.01
+#define RHO_r 0.001
+#define MU_r 0.001
 #define RE 5.0
 #define FR 2.26
 #define LEVEL 8
@@ -26,12 +22,6 @@ p[top] = dirichlet(0);
 scalar tau_qq[];
 tau_qq[bottom] = dirichlet(0);
 u.t[bottom] = dirichlet(0);
-
-/* The so-called "wetting condition"(?), which is the fraction of fluid enforced by VoF method. */
-//f[bottom] = 1.0;
-/* Removed in order to be able to specify contact angle. */
-//f[bottom] = neumann(0);
-
 
 /* Contact angle specification (removed axial symmetry) */
 vector h[];
@@ -49,7 +39,7 @@ int main() {
 	rho2 = RHO_r;
 	mu1 = BETA / RE;
 	mu2 = MU_r / RE;
-	f.sigma = 3.0;
+	f.sigma = 1.0;
 
 	mup = mupv;
 	lambda = lambdav;
@@ -61,7 +51,7 @@ int main() {
 }
 
 event init (t = 0) {
-	/* Viscoelastic stress tensor at wall with normal y. */
+	/* Viscoelastic stress tensor at floor with normal y. */
 	scalar s = tau_p.y.y;
 	s[bottom] = dirichlet(0.0);
 	fraction(f, -sq(x - 1.6) - sq(y - 2.0) + sq(0.5));
@@ -110,13 +100,6 @@ event viewing (i += 10) {
   draw_vof ("f", lw = 2);
   squares ("u.y", linear = true);
   box (notics = true);
-  /*
-  mirror ({0,1}) {
-    draw_vof ("f", lw = 2);
-    squares ("u.y", linear = true);
-    box (notics = true);
-  }
-  */
 
   save ("movie/tension_test_30.mp4");
 #if 0
