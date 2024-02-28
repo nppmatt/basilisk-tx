@@ -1,11 +1,11 @@
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
-#include "log-conform.h"
 #include "curvature.h"
-#include "view.h"
 #include "contact.h"
 #include "vof.h"
 #include "tension.h"
+#include "log-conform.h"
+#include "view.h"
 
 #define RHO_r 0.001
 #define MU_r 0.001
@@ -24,12 +24,9 @@ tau_qq[bottom] = dirichlet(0);
 u.t[bottom] = dirichlet(0);
 
 /* Contact angle specification (removed axial symmetry) */
-const double theta0 = 90.0;
+double theta0 = 15.0;
 vector h[];
 h.t[bottom] = contact_angle(theta0 * pi / 180.0);
-
-/* Surface tension energy (set directly in main for now) */
-//scalar sigma[] =  3.0;
 
 int main() {
 	size(3.2);
@@ -39,7 +36,7 @@ int main() {
 	rho2 = RHO_r;
 	mu1 = BETA / RE;
 	mu2 = MU_r / RE;
-	f.sigma = 0.1;
+	f.sigma = 0.05;
 
 	mup = mupv;
 	lambda = lambdav;
@@ -91,7 +88,7 @@ event logfile (i += 20; t <= 10) {
  * tx/ty are fractional and direction is negative.
  * */
 event viewing (i += 10) {
-  view (width = 640, height = 640, fov = 20, tx = -0.5, ty = -0.5,
+  view (width = 800, height = 800, fov = 20, tx = -0.5, ty = -0.5,
 	quat = {0, 0, 0, 0});
 
   clear();
@@ -99,7 +96,7 @@ event viewing (i += 10) {
   squares ("u.y", linear = true);
   box (notics = true);
 
-  save ("movie/tension_test_90.mp4");
+  save ("movie/tension_test_15.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);

@@ -48,12 +48,12 @@ pw_contact: $(SRC_DIR)/pw_contact.c
 	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
 	@echo "Finished!"
 
-tension_test_30: $(SRC_DIR)/tension_test_30.c
+tension_test_15: $(SRC_DIR)/tension_test_15.c
 	$(LMOD); wait && \
 	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
 	@echo "Finished!"
 
-tension_test_90: $(SRC_DIR)/tension_test_90.c
+tension_test_100: $(SRC_DIR)/tension_test_100.c
 	$(LMOD); wait && \
 	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
 	@echo "Finished!"
@@ -64,7 +64,7 @@ fine_mesh: pw_fine pw_fast_fine
 
 contact: pw_contact
 
-tension: tension_test_30 tension_test_90
+tension: tension_test_15 tension_test_100
 
 .PHONY: clean
 clean:
