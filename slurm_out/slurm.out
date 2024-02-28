@@ -1,12 +1,10 @@
 Loading modules.
-Loading modules.
-Loading easybuild, site, slurm/wulver
 Loading easybuild, site, slurm/wulver
 Loading GCCcore, binutils, Bison
-Loading GCCcore, binutils, Bison
-Loading GCC libunwind FFmpeg OpenMPI Mesa intel
 Loading GCC libunwind FFmpeg OpenMPI Mesa intel
 Modules loaded.
 Passing out/tension_test_90
-Modules loaded.
-Passing out/tension_test_30
+
+# Quadtree, 6045 steps, 663.982 CPU, 603.9 real, 8.72e+04 points.step/s, 32 var
+
+# Quadtree, 6063 steps, 692.924 CPU, 635.7 real, 8.59e+04 points.step/s, 32 var

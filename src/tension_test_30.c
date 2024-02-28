@@ -60,13 +60,11 @@ event init (t = 0) {
 		u.y[] = -f[] * 2.0;
 }
 
-/*
 event acceleration (i++) {
 	face vector av = a;
-	foreach_face(x)
-		av.x[] -= 0.0 / sq(FR);
+	foreach_face(y)
+		av.y[] -= 1.0 / sq(FR);
 }
-*/
 
 event properties (i++) {
 	foreach() {
