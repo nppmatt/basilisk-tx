@@ -24,8 +24,8 @@ tau_qq[bottom] = dirichlet(0);
 u.t[bottom] = dirichlet(0);
 
 /* Contact angle specification (removed axial symmetry) */
-vector h[];
 const double theta0 = 30.0;
+vector h[];
 h.t[bottom] = contact_angle(theta0 * pi / 180.0);
 
 /* Surface tension energy (set directly in main for now) */
