@@ -8,7 +8,7 @@
 #SBATCH --threads-per-core=1
 #SBATCH --partition=general
 #SBATCH --qos=low
-#SBATCH --time=01:00:00
+#SBATCH --time=00:15:00
 
 # Load all needed modules for Basilisk
 echo "Loading modules."

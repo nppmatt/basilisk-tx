@@ -1,6 +1,12 @@
 Loading modules.
+Loading modules.
+Loading easybuild, site, slurm/wulver
 Loading easybuild, site, slurm/wulver
 Loading GCCcore, binutils, Bison
+Loading GCCcore, binutils, Bison
+Loading GCC libunwind FFmpeg OpenMPI Mesa intel
 Loading GCC libunwind FFmpeg OpenMPI Mesa intel
 Modules loaded.
 Passing out/tension_test_90
+Modules loaded.
+Passing out/tension_test_30

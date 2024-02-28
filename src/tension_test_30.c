@@ -25,7 +25,7 @@ u.t[bottom] = dirichlet(0);
 
 /* Contact angle specification (removed axial symmetry) */
 vector h[];
-double theta0 = 30.0;
+const double theta0 = 30.0;
 h.t[bottom] = contact_angle(theta0 * pi / 180.0);
 
 /* Surface tension energy (set directly in main for now) */
@@ -39,7 +39,7 @@ int main() {
 	rho2 = RHO_r;
 	mu1 = BETA / RE;
 	mu2 = MU_r / RE;
-	f.sigma = 1.0;
+	f.sigma = 0.1;
 
 	mup = mupv;
 	lambda = lambdav;
