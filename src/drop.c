@@ -11,7 +11,7 @@
 #define MU_r 0.001
 #define RE 5.0
 #define FR 2.26
-#define LEVEL 8
+#define LEVEL 9
 #define BETA 0.1
 #define WI 1.0 // Weissenberg number
 
@@ -95,8 +95,9 @@ event movie (t += 0.01; t <= 15) {
   draw_vof ("f", lw = 2);
   squares ("u.y", linear = true);
   box (notics = true);
+  cells();
 
-  save ("movie/drop.mp4");
+  save ("movie/drop-grid.mp4");
 #if 0
   static FILE * fp = popen ("bppm","w");
   save (fp = fp);
