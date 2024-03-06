@@ -3,8 +3,4 @@ Loading easybuild, site, slurm/wulver
 Loading GCCcore, binutils, Bison
 Loading GCC libunwind FFmpeg OpenMPI Mesa intel
 Modules loaded.
-Passing out/tension_test_100
-
-# Quadtree, 5408 steps, 705.169 CPU, 630.4 real, 7.54e+04 points.step/s, 32 var
-
-# Quadtree, 5467 steps, 751.095 CPU, 673 real, 7.06e+04 points.step/s, 32 var
+Passing out/drop

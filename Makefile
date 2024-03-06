@@ -58,6 +58,11 @@ tension_test_100: $(SRC_DIR)/tension_test_100.c
 	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
 	@echo "Finished!"
 
+drop: $(SRC_DIR)/drop.c
+	$(LMOD); wait && \
+	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
+	@echo "Finished!"
+
 all: fall_test fall_test2 partial_wetting partial_wetting_fast pw_fine pw_fast_fine
 
 fine_mesh: pw_fine pw_fast_fine
@@ -65,6 +70,8 @@ fine_mesh: pw_fine pw_fast_fine
 contact: pw_contact
 
 tension: tension_test_15 tension_test_100
+
+drop: drop
 
 .PHONY: clean
 clean:
