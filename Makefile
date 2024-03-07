@@ -71,8 +71,6 @@ contact: pw_contact
 
 tension: tension_test_15 tension_test_100
 
-drop: drop
-
 .PHONY: clean
 clean:
 	rm $(OUT_DIR)/*
