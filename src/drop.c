@@ -11,7 +11,7 @@
 #define MU_r 0.001
 #define RE 5.0
 #define FR 2.26
-#define LEVEL 10
+#define LEVEL 9
 #define BETA 0.1
 #define WI 1.0 // Weissenberg number
 
@@ -87,7 +87,7 @@ event logfile (i += 20; t <= 10) {
 /* Refer to draw.h documentation. 
  * tx/ty are fractional and direction is negative.
  * */
-event movie (t += 0.001; t <= 15) {
+event movie (t += 0.005; t <= 20) {
   view (width = 800, height = 800, fov = 20, tx = -0.5, ty = -0.5,
 	quat = {0, 0, 0, 0});
 
