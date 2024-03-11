@@ -9,10 +9,10 @@
 
 #define RHO_r 0.001
 #define MU_r 0.001
-#define RE 5.0
-#define FR 2.26
-#define LEVEL 9
-#define BETA 0.1
+#define RE 942
+#define FR 1.0
+#define LEVEL 10
+#define BETA 1.0
 #define WI 1.0 // Weissenberg number
 
 scalar lambdav[], mupv[];
