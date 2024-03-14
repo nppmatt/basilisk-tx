@@ -73,7 +73,7 @@ event properties (i++) {
 #if TREE
 event adapt (i++) {
 	adapt_wavelet ({f, u.x, u.y}, (double[]){1e-2, 5e-3, 5e-3},
-			maxlevel = LEVEL, minlevel = LEVEL - 4);
+			maxlevel = LEVEL, minlevel = LEVEL - 5);
 }
 #endif
 
@@ -87,7 +87,7 @@ event logfile (i += 20; t <= 10) {
 /* Refer to draw.h documentation. 
  * tx/ty are fractional and direction is negative.
  * */
-event movie (t += 0.005; t <= 20) {
+event movie (t += 0.01; t <= 20) {
   view (width = 800, height = 800, fov = 20, tx = -0.5, ty = -0.5,
 	quat = {0, 0, 0, 0});
 
@@ -95,7 +95,7 @@ event movie (t += 0.005; t <= 20) {
   draw_vof ("f", lw = 2);
   squares ("u.y", linear = true);
   box (notics = true);
-  cells();
+  //cells();
 
   save ("movie/drop-grid.mp4");
 #if 0
