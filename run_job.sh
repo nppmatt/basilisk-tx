@@ -3,12 +3,13 @@
 #SBATCH -J basilisk_job
 #SBATCH -o slurm_out/slurm.out
 #SBATCH -e slurm_out/slurm.err
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=16
-#SBATCH --threads-per-core=1
-#SBATCH --partition=general
+#SBATCH --partition=gpu
 #SBATCH --qos=standard
-#SBATCH --time=24:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=8
+#SBATCH --gres=gpu:2
+#SBATCH --time=2:00:00
+#SBATCH --mem-per-cpu=4000M
 
 # Load all needed modules for Basilisk
 echo "Loading modules."

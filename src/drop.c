@@ -9,10 +9,10 @@
 
 #define RHO_r 0.001
 #define MU_r 0.001
-#define RE 942
-#define FR 1.0
-#define LEVEL 10
-#define BETA 1.0
+#define RE 5
+#define FR 2.26
+#define LEVEL 9
+#define BETA 0.1
 #define WI 1.0 // Weissenberg number
 
 scalar lambdav[], mupv[];
@@ -73,14 +73,14 @@ event properties (i++) {
 #if TREE
 event adapt (i++) {
 	adapt_wavelet ({f, u.x, u.y}, (double[]){1e-2, 5e-3, 5e-3},
-			maxlevel = LEVEL, minlevel = LEVEL - 5);
+			maxlevel = LEVEL, minlevel = LEVEL - 3);
 }
 #endif
 
 /* Logging spread diameter */
-event logfile (i += 20; t <= 10) {
+event logfile (i += 5; t <= 20) {
 	scalar pos[];
-	position (f, pos, {0,1});
+	position (f, pos, {1,0});
 	fprintf(stderr, "%g %g\n", t, 2.0 * statsf(pos).max);
 }
 
