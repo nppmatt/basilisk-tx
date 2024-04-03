@@ -44,7 +44,7 @@ Viscoelastic properties used are the ratio of the solvent
 to the total viscoelastic viscosity (polymeric
 plus solvent), BETA, and the relaxation time LAM. */
 
-#define BETA 1.                     // This is non-dimensional
+#define BETA 1.0                    // This is non-dimensional
 #define LAM 0.0                     // This is relaxation time in seconds
 
 scalar lambdav[], mupv[];
@@ -55,8 +55,8 @@ field](/src/heights.h) and set the contact angle boundary condition on
 its tangential component. */
 
 vector h[];
-double theta0 = 90.;
-h.t[bottom] = contact_angle (theta0*pi/180.);
+double theta0 = 90.0;
+h.t[bottom] = contact_angle (theta0*pi/180.0);
 
 /**
 The drop moves from top to bottom. We allow the fluid to get through top
@@ -84,8 +84,10 @@ int main()
   We initialize the physical properties of the
   two-phase system and the gravity value, all in SI. */
 
-  rho1 = 850.; rho2 = 1.25;
-  mu1 = BETA*0.1; mu2 = 1.e-5;      
+  rho1 = 850.0;
+  rho2 = 1.25;
+  mu1 = BETA*0.1;
+  mu2 = 1.0e-5;      
   f.sigma = 0.03;                   // These are wax physical properties
   G.y = -9.81;                      // Gravitational acceleration
 
@@ -105,11 +107,12 @@ int main()
   /**
   We set a maximum timestep, if needed for stability. */
   
-  DT = 1.e-2;
+  DT = 1.0e-2;
   //DT = HUGE;                      // For dimensionless time
 
   /**
-  We run for the range of contact angles. */
+  We run for the range of contact angles.
+  (e.g. Basilisk Sessile Drop demo) */
   
   init_grid (1 << LEVEL);
   //for (theta0 = 15; theta0 <= 105; theta0 += 15) {
@@ -128,7 +131,7 @@ event init (t = 0)
   set $tau_p_{yy}$ equal to zero at that boundary. */
   
   scalar s = tau_p.y.y;
-  s[bottom] = dirichlet(0.);
+  s[bottom] = dirichlet(0.0);
 
   /**
   The drop is centered on (0,0.3*L0) and has a radius of R0. */
@@ -139,7 +142,7 @@ event init (t = 0)
   The initial velocity of the droplet is -1.0 (m/s) */
 
   foreach()
-    u.y[] = -f[] * 1.;
+    u.y[] = -f[] * 1.0;
 }
 
 /**
@@ -155,7 +158,7 @@ event acceleration (i++) {
 
 event properties (i++) {
   foreach() {
-    mupv[] = 0.1*(1. - BETA)*clamp(f[],0,1);  // Polymeric viscosity of the drop
+    mupv[] = 0.1*(1.0 - BETA)*clamp(f[],0,1);  // Polymeric viscosity of the drop
     lambdav[] = LAM*clamp(f[],0,1);           // Relaxation time of the drop
   }
 }
@@ -178,7 +181,7 @@ We refine the region around the interface of the droplet. */
 
 #if TREE
 event adapt (i++) {
-  adapt_wavelet ({f,u.x,u.y}, (double []){1.e-2, 1.e-3, 1.e-3}, maxlevel, minlevel);
+  adapt_wavelet ({f,u.x,u.y}, (double []){1.0e-2, 1.0e-3, 1.0e-3}, maxlevel, minlevel);
 }
 #endif
 

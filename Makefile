@@ -3,7 +3,8 @@ CFLAGS=-O2 -std=c99 -Wall -D_XOPEN_SOURCE=700
 MPIGEN=-source -D_MPI=1
 MPICC=mpicc
 MPIFLAGS=-O2 -std=c99 -Wall -D_MPI=1
-LINKFLAGS=-lfb_osmesa -lOSMesa -lm
+# 2024-04-03: OSMesa not needed? LINKFLAGS=-lfb_osmesa -lOSMesa -lm
+LINKFLAGS=-lm
 
 .PHONY: source
 SHELL:=/bin/bash
