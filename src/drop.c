@@ -19,7 +19,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 */
 
 //#include "grid/multigrid.h"         // For Cartesian mesh
-//#include "grid/octree.h"            // For mesh adaptivity
+//#include "grid/octree.h"            // For 3D mesh adaptivity
 #include "navier-stokes/centered.h"
 #define FILTERED 1                    // Smooth out density and viscosity jumps (and relaxation time?)
 #include "two-phase.h"
@@ -30,38 +30,35 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 #include "tension.h"
 #include "log-conform.h"
 
-/**
-We initialize the maximum and minimum levels of refinement. */
+/*
+ * Viscoelastic properties used are the ratio of the solvent 
+ * to the total viscoelastic viscosity (polymeric
+ * plus solvent), BETA, and the relaxation time LAM.
+ * BETA is non-dimensional.
+ * LAM is the relaxation time in seconds.
+ * */
+#define BETA 1.0
+#define LAM 0.0
 
+/*
+ * We initialize the maximum and minimum levels of refinement.
+ * Best results are given by max values of 9-10, min may be 4 under.
+ * */
 #define LEVEL 9
+const int maxlevel = LEVEL;
+const int minlevel = LEVEL - 4;
 
-int maxlevel = LEVEL;                 // For better results this should 9-10
-int minlevel = LEVEL - 4;             // 4 levels of difference between min and max is good
-double R0 = 0.0025;                   // Drop initial radius in meter (e.g. 0.001 is a drop of radius 1 mm)
+/* Drop initial radius in meters. */
+double R0 = 0.0025;
 
-/**
-Viscoelastic properties used are the ratio of the solvent 
-to the total viscoelastic viscosity (polymeric
-plus solvent), BETA, and the relaxation time LAM. */
-
-#define BETA 1.0                    // This is non-dimensional
-#define LAM 0.0                     // This is relaxation time in seconds
 
 scalar lambdav[], mupv[];
 
-/**
-To set the contact angle, we allocate a [height-function
-field](/src/heights.h) and set the contact angle boundary condition on
-its tangential component. */
 
-vector h[];
-double theta0 = 90.0;
-h.t[bottom] = contact_angle (theta0*pi/180.0);
-
-/**
-The drop moves from top to bottom. We allow the fluid to get through top
-boundary. */
-
+/*
+ * The drop moves from top to bottom.
+ * We allow the fluid to get through top boundary unimpeded.
+ * */
 u.n[top] = neumann(0);
 p[top]   = dirichlet(0);
 
@@ -75,9 +72,20 @@ u.t[bottom] = dirichlet(0);          // Comment out for imposing slip boundary c
 //tau_qq[bottom] = dirichlet(0);     // This is the i=3, j=3 component of viscoelastic stress in axi-symmetric case
 //f[bottom] = neumann(0);            // This is for imposing fully non-wetting condition, i.e. theta0 = 180
 
-int main()
+/*
+ * To set the contact angle, we allocate a [height-function field](/src/heights.h)
+ * and set the contact angle boundary condition on its tangential component.
+ * */
+vector h[];
+double theta0 = 90.0;
+h.t[bottom] = contact_angle (theta0*pi/180.0);
+
+/* Signature: name, velocity */
+double velocity = 1.0;
+int main(int argc, char** argv)
 {
-  L0 = 2.5*(2.5*R0);                 // Domain size in meter; make it larger if the drop spreads beyond the substrate
+    /* Domain size in meters. */
+    L0 = 2.5*(2.5*R0);
 
 
   /**
@@ -90,6 +98,7 @@ int main()
   mu2 = 1.0e-5;      
   f.sigma = 0.03;                   // These are wax physical properties
   G.y = -9.81;                      // Gravitational acceleration
+  velocity = atof(argv[1]);
 
   /**
   We initialize viscoelastic fields below. */
@@ -140,15 +149,12 @@ event init (t = 0)
 
   /**
   The initial velocity of the droplet is -1.0 (m/s) */
-
   foreach()
-    u.y[] = -f[] * 1.0;
+    u.y[] = -f[] * velocity;
 }
 
 /**
-We add the acceleration of gravity, if not using reduced method.*/
-
-/*
+We add the acceleration of gravity, if not using reduced method.
 event acceleration (i++) {
   face vector av = a;
   foreach_face(y)
@@ -196,12 +202,13 @@ event logfile (i += 50; t <= 1) {
 
 /* Movies: in 3D, these are in a z=0 cross-section. */
 
+/* Suppress videos temporarily.
 event output_interface (i += 50; t <= 1) {
  
   {
     char *outfile2 = NULL;
     outfile2 = (char *) malloc(sizeof(char) * 256);
-    sprintf(outfile2, "interface-%d", i);
+    sprintf(outfile2, "interface/%d.out", i);
     FILE * fp_interface = fopen (outfile2, "w");
     output_facets (f, fp_interface);
     fclose(fp_interface);
@@ -220,6 +227,7 @@ event output_interface (i += 50; t <= 1) {
     //output_ppm (l, fp2, min = 5, max = 7, n = 512);
   //}
 }
+*/
 
 /**
 At equilibrium (t = 10 seems sufficient), we output the interface
