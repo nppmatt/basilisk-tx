@@ -1,0 +1,6 @@
+Loading modules.
+Loading easybuild, site, slurm/wulver
+Loading GCCcore, binutils, Bison
+Loading GCC libunwind FFmpeg OpenMPI Mesa intel
+Modules loaded.
+Running drop.c with arg vel: 1.5

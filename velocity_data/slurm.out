@@ -1,0 +1,8 @@
+Loading modules.
+Loading easybuild, site, slurm/wulver
+Loading GCCcore, binutils, Bison
+Loading GCC libunwind FFmpeg OpenMPI Mesa intel
+Modules loaded.
+Passing out/drop
+
+# Quadtree, 89155 steps, 5745.42 CPU, 5770 real, 1.32e+05 points.step/s, 32 var
