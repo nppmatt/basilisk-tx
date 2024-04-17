@@ -3,10 +3,10 @@
 #SBATCH -J basilisk_job
 #SBATCH --output=%x.%j.out # %x.%j expands to slurm JobName.JobID
 #SBATCH --partition=general
-#SBATCH --qos=low
+#SBATCH --qos=standard
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
-#SBATCH --time=2:00:00
+#SBATCH --time=1:00:00
 #SBATCH --mem-per-cpu=16384M
 
 # Load all needed modules for Basilisk
