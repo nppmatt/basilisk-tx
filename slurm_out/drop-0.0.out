@@ -5,4 +5,4 @@ Loading GCC libunwind FFmpeg OpenMPI Mesa intel
 Modules loaded.
 Running drop.c with arg vel: 0.0
 
-# Quadtree, 20010 steps, 209.215 CPU, 210.1 real, 3.02e+05 points.step/s, 32 var
+# Quadtree, 20328 steps, 1728.61 CPU, 1735 real, 2.49e+05 points.step/s, 32 var

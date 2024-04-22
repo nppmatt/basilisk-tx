@@ -44,12 +44,12 @@ Note that small contact angles are not accessible yet (/src/contact.h).
  * We initialize the maximum and minimum levels of refinement.
  * Best results are given by max values of 9-10, min may be 4 under.
  * */
-#define LEVEL 9
+#define LEVEL 10
 const int maxlevel = LEVEL;
-const int minlevel = LEVEL - 4;
+const int minlevel = LEVEL - 3;
 
 /* Drop initial radius in meters. */
-double R0 = 0.00225;
+const double R0 = 0.0025;
 
 
 scalar lambdav[], mupv[];
@@ -85,7 +85,7 @@ double velocity = 1.0;
 int main(int argc, char** argv)
 {
     /* Domain size in meters. */
-    L0 = 1.0;
+    L0 = R0 * 100;
 
 
   /**
