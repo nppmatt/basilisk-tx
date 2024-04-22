@@ -49,7 +49,7 @@ const int maxlevel = LEVEL;
 const int minlevel = LEVEL - 4;
 
 /* Drop initial radius in meters. */
-double R0 = 0.0025;
+double R0 = 0.00225;
 
 
 scalar lambdav[], mupv[];
@@ -85,7 +85,7 @@ double velocity = 1.0;
 int main(int argc, char** argv)
 {
     /* Domain size in meters. */
-    L0 = 2.5*(2.5*R0);
+    L0 = 1.0;
 
 
   /**
@@ -93,7 +93,7 @@ int main(int argc, char** argv)
   two-phase system and the gravity value, all in SI. */
 
   rho1 = 850.0;
-  rho2 = 1.25;
+  rho2 = 1.225;
   mu1 = BETA*0.1;
   mu2 = 1.0e-5;      
   f.sigma = 0.03;                   // These are wax physical properties
@@ -116,7 +116,7 @@ int main(int argc, char** argv)
   /**
   We set a maximum timestep, if needed for stability. */
   
-  DT = 1.0e-2;
+  DT = 1.0e-4;
   //DT = HUGE;                      // For dimensionless time
 
   /**
@@ -145,7 +145,7 @@ event init (t = 0)
   /**
   The drop is centered on (0,0.3*L0) and has a radius of R0. */
 
-  fraction (f, - (sq(x) + sq(y - 0.75*L0) - sq(R0)));
+  fraction (f, - (sq(x) + sq(y - 0.23716*L0) - sq(R0)));
 
   /**
   The initial velocity of the droplet is -1.0 (m/s) */
@@ -194,7 +194,7 @@ event adapt (i++) {
 /**
 We track the normalized spreading diameter of the droplet. */
 
-event logfile (i += 50; t <= 1) {
+event logfile (i += 1; t <= 2) {
   scalar pos[];
   position (f, pos, {1,0});
   fprintf (stderr, "%g %g\n", t, (statsf(pos).max)/R0);
