@@ -44,9 +44,9 @@ Note that small contact angles are not accessible yet (/src/contact.h).
  * We initialize the maximum and minimum levels of refinement.
  * Best results are given by max values of 9-10, min may be 4 under.
  * */
-#define LEVEL 10
+#define LEVEL 11
 const int maxlevel = LEVEL;
-const int minlevel = LEVEL - 3;
+const int minlevel = LEVEL - 4;
 
 /* Drop initial radius in meters. */
 const double R0 = 0.0025;
