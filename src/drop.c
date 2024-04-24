@@ -44,7 +44,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
  * We initialize the maximum and minimum levels of refinement.
  * Best results are given by max values of 9-10, min may be 4 under.
  * */
-#define LEVEL 11
+#define LEVEL 10
 const int maxlevel = LEVEL;
 const int minlevel = LEVEL - 4;
 
@@ -75,9 +75,10 @@ u.t[bottom] = dirichlet(0);          // Comment out for imposing slip boundary c
 /*
  * To set the contact angle, we allocate a [height-function field](/src/heights.h)
  * and set the contact angle boundary condition on its tangential component.
+ * 53 deg corresponds to wax on plaskolite
  * */
 vector h[];
-double theta0 = 90.0;
+double theta0 = 53.0;
 h.t[bottom] = contact_angle (theta0*pi/180.0);
 
 /* Signature: name, velocity */
@@ -97,7 +98,7 @@ int main(int argc, char** argv)
   mu1 = BETA*0.1;
   mu2 = 1.0e-5;      
   f.sigma = 0.03;                   // These are wax physical properties
-  G.y = -9.81;                      // Gravitational acceleration
+  G.y = -9.807;                      // Gravitational acceleration
   velocity = atof(argv[1]);
 
   /**
@@ -143,9 +144,11 @@ event init (t = 0)
   s[bottom] = dirichlet(0.0);
 
   /**
-  The drop is centered on (0,0.3*L0) and has a radius of R0. */
+  * The drop is centered on (0,0.3*L0) and has a radius of R0.
+  * 0.94864 of a 25cm domain corresponds to experiment of wax on plaskolite
+  */
 
-  fraction (f, - (sq(x) + sq(y - 0.23716*L0) - sq(R0)));
+  fraction (f, - (sq(x) + sq(y - 0.94864*L0) - sq(R0)));
 
   /**
   The initial velocity of the droplet is -1.0 (m/s) */
@@ -194,10 +197,10 @@ event adapt (i++) {
 /**
 We track the normalized spreading diameter of the droplet. */
 
-event logfile (i += 1; t <= 2) {
+event logfile (i += 1; t <= 0.6) {
   scalar pos[];
   position (f, pos, {1,0});
-  fprintf (stderr, "%g %g\n", t, (statsf(pos).max)/R0);
+  fprintf ( stderr, "%.15g,%.15g,%.15g\n", t, (statsf(pos).max)/R0, velocity );
 }
 
 /* Movies: in 3D, these are in a z=0 cross-section. */
