@@ -44,7 +44,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
  * We initialize the maximum and minimum levels of refinement.
  * Best results are given by max values of 9-10, min may be 4 under.
  * */
-#define LEVEL 10
+#define LEVEL 11
 const int maxlevel = LEVEL;
 const int minlevel = LEVEL - 4;
 
@@ -197,10 +197,10 @@ event adapt (i++) {
 /**
 We track the normalized spreading diameter of the droplet. */
 
-event logfile (i += 1; t <= 0.6) {
+event logfile (i += 1; t <= 1.0) {
   scalar pos[];
   position (f, pos, {1,0});
-  fprintf ( stderr, "%.15g,%.15g,%.15g\n", t, (statsf(pos).max)/R0, velocity );
+  fprintf ( stderr, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );
 }
 
 /* Movies: in 3D, these are in a z=0 cross-section. */

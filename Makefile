@@ -10,7 +10,6 @@ LINKFLAGS=-lm
 SHELL:=/bin/bash
 LMOD=source load_modules.sh
 
-
 SRC_DIR:=src
 OUT_DIR:=out
 
@@ -75,3 +74,4 @@ tension: tension_test_15 tension_test_100
 .PHONY: clean
 clean:
 	rm $(OUT_DIR)/*
+
