@@ -205,7 +205,6 @@ event logfile (i += 1; t <= 1.0) {
 
 /* Movies: in 3D, these are in a z=0 cross-section. */
 
-/* Suppress videos temporarily.
 event output_interface (i += 50; t <= 1) {
  
   {
@@ -230,7 +229,6 @@ event output_interface (i += 50; t <= 1) {
     //output_ppm (l, fp2, min = 5, max = 7, n = 512);
   //}
 }
-*/
 
 /**
 At equilibrium (t = 10 seems sufficient), we output the interface
