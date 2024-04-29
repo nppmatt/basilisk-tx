@@ -44,7 +44,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
  * We initialize the maximum and minimum levels of refinement.
  * Best results are given by max values of 9-10, min may be 4 under.
  * */
-#define LEVEL 11
+#define LEVEL 10
 const int maxlevel = LEVEL;
 const int minlevel = LEVEL - 4;
 
@@ -86,7 +86,7 @@ double velocity = 1.0;
 int main(int argc, char** argv)
 {
     /* Domain size in meters. */
-    L0 = R0 * 100;
+    L0 = R0 * 10;
 
 
   /**
@@ -148,7 +148,7 @@ event init (t = 0)
   * 0.94864 of a 25cm domain corresponds to experiment of wax on plaskolite
   */
 
-  fraction (f, - (sq(x) + sq(y - 0.94864*L0) - sq(R0)));
+  fraction (f, - (sq(x) + sq(y - 0.1*L0) - sq(R0)));
 
   /**
   The initial velocity of the droplet is -1.0 (m/s) */
