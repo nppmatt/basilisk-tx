@@ -148,7 +148,7 @@ event init (t = 0)
   * 0.94864 of a 25cm domain corresponds to experiment of wax on plaskolite
   */
 
-  fraction (f, - (sq(x) + sq(y - 0.1*L0) - sq(R0)));
+  fraction (f, - (sq(x) + sq(y - 0.15*L0) - sq(R0)));
 
   /**
   The initial velocity of the droplet is -1.0 (m/s) */
@@ -197,14 +197,14 @@ event adapt (i++) {
 /**
 We track the normalized spreading diameter of the droplet. */
 
-event logfile (i += 1; t <= 1.0) {
+event logfile (i += 1; t <= 0.6) {
   scalar pos[];
   position (f, pos, {1,0});
   fprintf ( stderr, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );
 }
 
 /* Movies: in 3D, these are in a z=0 cross-section. */
-
+/*
 event output_interface (i += 50; t <= 1) {
  
   {
@@ -229,7 +229,7 @@ event output_interface (i += 50; t <= 1) {
     //output_ppm (l, fp2, min = 5, max = 7, n = 512);
   //}
 }
-
+*/
 /**
 At equilibrium (t = 10 seems sufficient), we output the interface
 shape and compute the (constant) curvature. */
