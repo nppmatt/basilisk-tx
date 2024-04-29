@@ -20,8 +20,8 @@ for file in "$directory"/*.err; do
         tail -n +23 "$file" > "$file.tmp"
 
 	# Remove the last line from the file
-	echo "Remove tail"
-	head -n -1 "$file.tmp" > "$file.tmp"
+	#echo "Remove tail"
+	#head -n -1 "$file" > "$file.tmp"
 
         # Replace the original file with the temporary file
         mv "$file.tmp" "$file"
