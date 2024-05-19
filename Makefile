@@ -11,67 +11,22 @@ SHELL:=/bin/bash
 LMOD=source load_modules.sh
 
 SRC_DIR:=src
-OUT_DIR:=out
+BIN_DIR:=bin
+OBJ_DIR:=obj
+INC_DIR:=$(SRC_DIR)/include
 
-fall_test: $(SRC_DIR)/fall_test.c
+toml: $(INC_DIR)/toml.h $(INC_DIR)/toml.c
+	gcc $(CFLAGS) -I$(INC_DIR) -c $(INC_DIR)/$@.c -o $(OBJ_DIR)/$@.o
+
+drop: $(SRC_DIR)/drop.c $(OBJ_DIR)/toml.o
 	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-fall_test2: $(SRC_DIR)/fall_test2.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-partial_wetting: $(SRC_DIR)/partial_wetting.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-partial_wetting_fast: $(SRC_DIR)/partial_wetting_fast.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-pw_fine: $(SRC_DIR)/pw_fine.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-pw_fast_fine: $(SRC_DIR)/pw_fast_fine.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-pw_contact: $(SRC_DIR)/pw_contact.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-tension_test_15: $(SRC_DIR)/tension_test_15.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-tension_test_100: $(SRC_DIR)/tension_test_100.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-drop: $(SRC_DIR)/drop.c
-	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -autolink $< -o $(OUT_DIR)/$@ $(LINKFLAGS)
-	@echo "Finished!"
-
-all: fall_test fall_test2 partial_wetting partial_wetting_fast pw_fine pw_fast_fine
-
-fine_mesh: pw_fine pw_fast_fine
-
-contact: pw_contact
-
-tension: tension_test_15 tension_test_100
+	$(CC) $(CFLAGS) -I$(INC_DIR) -c $< -o $(OBJ_DIR)/$@.o
+	$(CC) $(CFLAGS) -I$(INC_DIR) -autolink $(OBJ_DIR)/toml.o $(OBJ_DIR)/$@.o \
+		-o $(BIN_DIR)/$@ $(LINKFLAGS)
+	@echo "Complete"
+	@echo "Run: ./bin/$@"
 
 .PHONY: clean
 clean:
-	rm $(OUT_DIR)/*
+	rm $(BIN_DIR)/*
 

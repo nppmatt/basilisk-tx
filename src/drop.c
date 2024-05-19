@@ -29,6 +29,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 #include "vof.h"
 #include "tension.h"
 #include "log-conform.h"
+#include "include/toml.h"
 
 /*
  * Viscoelastic properties used are the ratio of the solvent 
@@ -44,7 +45,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
  * We initialize the maximum and minimum levels of refinement.
  * Best results are given by max values of 9-10, min may be 4 under.
  * */
-#define LEVEL 10
+#define LEVEL 9
 const int maxlevel = LEVEL;
 const int minlevel = LEVEL - 4;
 
@@ -78,7 +79,7 @@ u.t[bottom] = dirichlet(0);          // Comment out for imposing slip boundary c
  * 53 deg corresponds to wax on plaskolite
  * */
 vector h[];
-double theta0 = 53.0;
+double theta0 = 90.0;
 h.t[bottom] = contact_angle (theta0*pi/180.0);
 
 /* Signature: name, velocity */
@@ -93,7 +94,7 @@ int main(int argc, char** argv)
   We initialize the physical properties of the
   two-phase system and the gravity value, all in SI. */
 
-  rho1 = 850.0;
+  rho1 = 997.0;
   rho2 = 1.225;
   mu1 = BETA*0.1;
   mu2 = 1.0e-5;      
