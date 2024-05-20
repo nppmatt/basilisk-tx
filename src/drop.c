@@ -18,18 +18,28 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 
 */
 
-//#include "grid/multigrid.h"         // For Cartesian mesh
-//#include "grid/octree.h"            // For 3D mesh adaptivity
+/* For Cartesian mesh. */
+//#include "grid/multigrid.h"
+
+/* For 3D adaptive mesh. */
+//#include "grid/octree.h"
+
 #include "navier-stokes/centered.h"
-#define FILTERED 1                    // Smooth out density and viscosity jumps (and relaxation time?)
 #include "two-phase.h"
 #include "curvature.h"
-#include "reduced.h"                  // Using reduced gravity approach
+
+/* Enables reduced-gravity approach. */
+#include "reduced.h"
 #include "contact.h"
 #include "vof.h"
 #include "tension.h"
 #include "log-conform.h"
+
+/* For reading configuration file. */
 #include "include/toml.h"
+
+/* Smooth out jumps in density and viscosity. */
+#define FILTERED 1
 
 /*
  * Viscoelastic properties used are the ratio of the solvent 
@@ -76,7 +86,6 @@ u.t[bottom] = dirichlet(0);          // Comment out for imposing slip boundary c
 /*
  * To set the contact angle, we allocate a [height-function field](/src/heights.h)
  * and set the contact angle boundary condition on its tangential component.
- * 53 deg corresponds to wax on plaskolite
  * */
 vector h[];
 double theta0 = 90.0;
@@ -86,20 +95,29 @@ h.t[bottom] = contact_angle (theta0*pi/180.0);
 double velocity = 1.0;
 int main(int argc, char** argv)
 {
+    /* Reference:
+     * https://github.com/cktan/tomlc99
+     * */
+    FILE* configFile;
+    configFile = fopen(argv[1], "r");
+
     /* Domain size in meters. */
     L0 = R0 * 10;
 
 
   /**
   We initialize the physical properties of the
-  two-phase system and the gravity value, all in SI. */
+  two-phase system and the gravity value, all in SI units.
+  */
 
   rho1 = 997.0;
   rho2 = 1.225;
   mu1 = BETA*0.1;
   mu2 = 1.0e-5;      
   f.sigma = 0.03;                   // These are wax physical properties
-  G.y = -9.807;                      // Gravitational acceleration
+  
+  /* Acceleration of gravity */
+  G.y = -9.807;
   velocity = atof(argv[1]);
 
   /**
