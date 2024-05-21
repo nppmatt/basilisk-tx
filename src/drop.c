@@ -1,5 +1,4 @@
 /**
-
 A Newtonian/viscoelastic drop impacting a solid surface, with or 
 without gravity. The equilibrium shape should be controlled by 
 surface tension, in the absence of gravity, defined by the 
@@ -15,7 +14,6 @@ interface should be constant at equilibrium (this is with no
 gravity present).
 
 Note that small contact angles are not accessible yet (/src/contact.h).
-
 */
 
 /* For Cartesian mesh. */
@@ -30,6 +28,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 
 /* Enables reduced-gravity approach. */
 #include "reduced.h"
+
 #include "contact.h"
 #include "vof.h"
 #include "tension.h"
@@ -37,191 +36,213 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 
 /* For reading configuration file. */
 #include "include/toml.h"
+#include <errno.h>
 
 /* Smooth out jumps in density and viscosity. */
 #define FILTERED 1
 
-/*
- * Viscoelastic properties used are the ratio of the solvent 
+/* Viscoelastic properties used are the ratio of the solvent 
  * to the total viscoelastic viscosity (polymeric
  * plus solvent), BETA, and the relaxation time LAM.
  * BETA is non-dimensional.
  * LAM is the relaxation time in seconds.
- * */
+ */
 #define BETA 1.0
 #define LAM 0.0
 
-/*
- * We initialize the maximum and minimum levels of refinement.
+/* We initialize the maximum and minimum levels of refinement.
  * Best results are given by max values of 9-10, min may be 4 under.
- * */
+ */
 #define LEVEL 9
 const int maxlevel = LEVEL;
 const int minlevel = LEVEL - 4;
 
-/* Drop initial radius in meters. */
-const double R0 = 0.0025;
 
-
+/* Define default viscoelastic fields. */
 scalar lambdav[], mupv[];
 
-
-/*
- * The drop moves from top to bottom.
+/* The drop moves from top to bottom.
  * We allow the fluid to get through top boundary unimpeded.
- * */
+ */
 u.n[top] = neumann(0);
 p[top]   = dirichlet(0);
 
 
 /**
 The wall is at the bottom side. We apply a no-slip boundary condition. */
-
 u.t[bottom] = dirichlet(0);          // Comment out for imposing slip boundary condition
 //u.t[bottom] = neumann(0);          // This slip boundary condition
 //u.n[bottom]  = dirichlet(0.);      // This is imposed by default
 //tau_qq[bottom] = dirichlet(0);     // This is the i=3, j=3 component of viscoelastic stress in axi-symmetric case
 //f[bottom] = neumann(0);            // This is for imposing fully non-wetting condition, i.e. theta0 = 180
 
-/*
- * To set the contact angle, we allocate a [height-function field](/src/heights.h)
+
+/* Drop experiment parameters. */
+double R0;
+double initHeight;
+double velocity;
+
+/* To set the contact angle, we allocate a [height-function field](/src/heights.h)
  * and set the contact angle boundary condition on its tangential component.
  * */
 vector h[];
-double theta0 = 90.0;
-h.t[bottom] = contact_angle (theta0*pi/180.0);
+double theta0;
 
-/* Signature: name, velocity */
-double velocity = 1.0;
+/* How long the simulation will last. */
+double simDuration;
+
+/* TODO: Break config parsing and globals to utility header */
+toml_table_t* materials;
+toml_table_t* drop;
+toml_table_t* sim;
+
+static void tomlError(const char* msg, const char* msg1)
+{
+    fprintf(stderr, "TOML PARSING ERROR: %s%s\n", msg, msg1?msg1:"");
+    exit(1);
+}
+
 int main(int argc, char** argv)
 {
-    /* Reference:
-     * https://github.com/cktan/tomlc99
-     * */
     FILE* configFile;
+    char errbuf[256];
+    /* For now, execution ought to be something like:
+     * ./bin/drop config/wax.toml
+     */
     configFile = fopen(argv[1], "r");
+    if (!configFile) {
+        tomlError("Failed to open configuration - ", strerror(errno));
+    }
 
-    /* Domain size in meters. */
+    toml_table_t* config = toml_parse_file(configFile, errbuf, sizeof(errbuf));
+    if (!config) {
+        tomlError("Cannot parse loaded config - ", errbuf);
+    }
+    fclose(configFile);
+
+    /* Config loaded and parsed, start loading and assigning parameters. */
+    materials = toml_table_in(config, "materials");
+    drop = toml_table_in(config, "drop");
+    sim = toml_table_in(config, "sim");
+
+    /**
+    We initialize the physical properties of the
+    two-phase system and the gravity value, all in SI units.
+    */
+    rho1 = (double)(toml_double_in(materials.liquid, "rho")).u.d;
+    mu1 = BETA * (double)(toml_double_in(materials.liquid, "mu")).u.d;
+    f.sigma = (double)(toml_double_in(materials.liquid, "sigma")).u.d;
+
+    rho2 = (double)(toml_double_in(materials.gas, "rho")).u.d;
+    mu2 = (double)(toml_double_in(materials.gas, "mu")).u.d;
+
+    /* Acceleration of gravity */
+    G.y = -9.807;
+
+    /* Set experiment parameters,
+     * beginning with drop radius and the domain size dependent on it. */
+    R0 = (double)(toml_double_in(drop, "radius")).u.d;
+    velocity = (double)(toml_double_in(drop, "velocity")).u.d;
+    theta0 = (double)(toml_double_in(drop, "contact-angle")).u.d;
+    h.t[bottom] = contact_angle(theta0*pi/180.0);
     L0 = R0 * 10;
 
+    /* We initialize viscoelastic fields below. */
+    mup = mupv;
+    lambda = lambdav;
 
-  /**
-  We initialize the physical properties of the
-  two-phase system and the gravity value, all in SI units.
-  */
+    /**
+    We must associate the height function field with the VOF tracer, so
+    that it is used by the relevant functions (curvature calculation in
+    particular). */
+    f.height = h;
 
-  rho1 = 997.0;
-  rho2 = 1.225;
-  mu1 = BETA*0.1;
-  mu2 = 1.0e-5;      
-  f.sigma = 0.03;                   // These are wax physical properties
-  
-  /* Acceleration of gravity */
-  G.y = -9.807;
-  velocity = atof(argv[1]);
+    /* We set a maximum timestep, if needed for stability. */
+    DT = (double)(toml_double_in(sim, "max-timestep")).u.d;
+    simDuration = (double)(toml_double_in(sim, "duration")).u.d;
 
-  /**
-  We initialize viscoelastic fields below. */
-  
-  mup = mupv;
-  lambda = lambdav;
+    /*
+     * We run for the range of contact angles.
+     * (e.g. Basilisk Sessile Drop demo)
+    init_grid (1 << LEVEL);
+    for (theta0 = 15; theta0 <= 105; theta0 += 15) {
+        run();
+    }
+    */
 
-  /**
-  We must associate the height function field with the VOF tracer, so
-  that it is used by the relevant functions (curvature calculation in
-  particular). */
-
-  f.height = h;
-
-  /**
-  We set a maximum timestep, if needed for stability. */
-  
-  DT = 1.0e-4;
-  //DT = HUGE;                      // For dimensionless time
-
-  /**
-  We run for the range of contact angles.
-  (e.g. Basilisk Sessile Drop demo) */
-  
-  init_grid (1 << LEVEL);
-  //for (theta0 = 15; theta0 <= 105; theta0 += 15) {
+    init_grid (1 << LEVEL);
     run();
-  //}
 }
+
 
 /**
 The initial drop is a semi circle. */
-
 event init (t = 0)
 {
-  /**
-  At a wall of normal $\mathbf{n}$ the component of the viscoelastic
-  stress tensor $tau_p_{nn}$ is zero. Since the bottom boundary is a wall, we
-  set $tau_p_{yy}$ equal to zero at that boundary. */
-  
-  scalar s = tau_p.y.y;
-  s[bottom] = dirichlet(0.0);
+    /**
+    At a wall of normal $\mathbf{n}$ the component of the viscoelastic
+    stress tensor $tau_p_{nn}$ is zero. Since the bottom boundary is a wall, we
+    set $tau_p_{yy}$ equal to zero at that boundary. */
+    scalar s = tau_p.y.y;
+    s[bottom] = dirichlet(0.0);
 
-  /**
-  * The drop is centered on (0,0.3*L0) and has a radius of R0.
-  * 0.94864 of a 25cm domain corresponds to experiment of wax on plaskolite
-  */
+    /**
+    * The drop is centered on a offset (eq. of circle) and has a radius of R0.
+    */
+    initHeight = (double)(toml_double_in(sim, "duration")).u.d;
+    fraction (f, - (sq(x) + sq(y - initHeight*L0) - sq(R0)));
 
-  fraction (f, - (sq(x) + sq(y - 0.15*L0) - sq(R0)));
-
-  /**
-  The initial velocity of the droplet is -1.0 (m/s) */
-  foreach()
+    /**
+    The initial velocity of the droplet is -1.0 (m/s) */
+    foreach()
     u.y[] = -f[] * velocity;
 }
 
 /**
 We add the acceleration of gravity, if not using reduced method.
 event acceleration (i++) {
-  face vector av = a;
-  foreach_face(y)
+    face vector av = a;
+    foreach_face(y)
     av.y[] -= 9.81;
 }
 */
-
 event properties (i++) {
-  foreach() {
+    foreach() {
     mupv[] = 0.1*(1.0 - BETA)*clamp(f[],0,1);  // Polymeric viscosity of the drop
     lambdav[] = LAM*clamp(f[],0,1);           // Relaxation time of the drop
-  }
+    }
 }
 
 #if 0
 event logfile (i++)
 {
-  fprintf (fout, "%g %g\n", t, normf(u.x).max);
+    fprintf (fout, "%g %g\n", t, normf(u.x).max);
 }
 
 event snapshots (t += 1)
 {
-  p.nodump = false;
-  dump();
+    p.nodump = false;
+    dump();
 }
 #endif
 
 /**
 We refine the region around the interface of the droplet. */
-
 #if TREE
 event adapt (i++) {
-  adapt_wavelet ({f,u.x,u.y}, (double []){1.0e-2, 1.0e-3, 1.0e-3}, maxlevel, minlevel);
+    adapt_wavelet ({f,u.x,u.y}, (double []){1.0e-2, 1.0e-3, 1.0e-3}, maxlevel, minlevel);
 }
 #endif
 
 /**
 We track the normalized spreading diameter of the droplet. */
-
-event logfile (i += 1; t <= 0.6) {
-  scalar pos[];
-  position (f, pos, {1,0});
-  fprintf ( stderr, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );
+event logfile (i += 1; t <= simDuration) {
+    scalar pos[];
+    position (f, pos, {1,0});
+    fprintf ( stderr, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );
 }
 
+/* TODO 2024-05-20: Move rendering code to separate section.*/
 /* Movies: in 3D, these are in a z=0 cross-section. */
 /*
 event output_interface (i += 50; t <= 1) {

@@ -8,7 +8,7 @@ LINKFLAGS=-lm
 
 .PHONY: source
 SHELL:=/bin/bash
-LMOD=source load_modules.sh
+LMOD=source scripts/load_modules.sh
 
 SRC_DIR:=src
 BIN_DIR:=bin
