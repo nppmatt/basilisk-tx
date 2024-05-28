@@ -6,12 +6,12 @@ description = "Wax droplet falling on solid surface."
 # rho: density
 # mu: viscosity
 # sigma: shear stress constant
-[materials.liquid]
+[liquid]
     rho = 997.0
     mu = 0.1
     sigma = 0.03
 
-[materials.gas]
+[gas]
     rho = 1.225
     mu = 1.0e-5
 

@@ -92,7 +92,8 @@ double theta0;
 double simDuration;
 
 /* TODO: Break config parsing and globals to utility header */
-toml_table_t* materials;
+toml_table_t* liquid;
+toml_table_t* gas;
 toml_table_t* drop;
 toml_table_t* sim;
 
@@ -121,7 +122,8 @@ int main(int argc, char** argv)
     fclose(configFile);
 
     /* Config loaded and parsed, start loading and assigning parameters. */
-    materials = toml_table_in(config, "materials");
+    liquid = toml_table_in(config, "liquid");
+    gas = toml_table_in(config, "gas");
     drop = toml_table_in(config, "drop");
     sim = toml_table_in(config, "sim");
 
@@ -129,18 +131,19 @@ int main(int argc, char** argv)
     We initialize the physical properties of the
     two-phase system and the gravity value, all in SI units.
     */
-    rho1 = (double)(toml_double_in(materials.liquid, "rho")).u.d;
-    mu1 = BETA * (double)(toml_double_in(materials.liquid, "mu")).u.d;
-    f.sigma = (double)(toml_double_in(materials.liquid, "sigma")).u.d;
+    rho1 = (double)(toml_double_in(liquid, "rho")).u.d;
+    mu1 = BETA * (double)(toml_double_in(liquid, "mu")).u.d;
+    f.sigma = (double)(toml_double_in(liquid, "sigma")).u.d;
 
-    rho2 = (double)(toml_double_in(materials.gas, "rho")).u.d;
-    mu2 = (double)(toml_double_in(materials.gas, "mu")).u.d;
+    rho2 = (double)(toml_double_in(gas, "rho")).u.d;
+    mu2 = (double)(toml_double_in(gas, "mu")).u.d;
 
     /* Acceleration of gravity */
     G.y = -9.807;
 
     /* Set experiment parameters,
-     * beginning with drop radius and the domain size dependent on it. */
+     * beginning with drop radius and the domain size dependent on it.
+     */
     R0 = (double)(toml_double_in(drop, "radius")).u.d;
     velocity = (double)(toml_double_in(drop, "velocity")).u.d;
     theta0 = (double)(toml_double_in(drop, "contact-angle")).u.d;
@@ -157,8 +160,11 @@ int main(int argc, char** argv)
     particular). */
     f.height = h;
 
-    /* We set a maximum timestep, if needed for stability. */
-    DT = (double)(toml_double_in(sim, "max-timestep")).u.d;
+    /* We set a maximum timestep, if needed for stability.
+     * DT is an interpreted constant. Hence the indirect assignment.
+     */
+    double config_dt = (double)(toml_double_in(sim, "max-timestep")).u.d;
+    DT = config_dt;
     simDuration = (double)(toml_double_in(sim, "duration")).u.d;
 
     /*
@@ -189,7 +195,7 @@ event init (t = 0)
     /**
     * The drop is centered on a offset (eq. of circle) and has a radius of R0.
     */
-    initHeight = (double)(toml_double_in(sim, "duration")).u.d;
+    initHeight = (double)(toml_double_in(drop, "init-height")).u.d;
     fraction (f, - (sq(x) + sq(y - initHeight*L0) - sq(R0)));
 
     /**
