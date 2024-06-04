@@ -31,6 +31,6 @@ description = "Wax droplet falling on solid surface."
 # max-timestep: In seconds. Constrains solver adaptivity in temporal domain.
 # duration: Total time to simulate, in seconds.
 [sim]
-    max-timestep = 1.0e-4
+    max-timestep = 1.0e-5
     duration = 0.5
 

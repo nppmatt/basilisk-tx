@@ -258,7 +258,7 @@ event logfile (i += 1; t <= simDuration) {
 
 /* TODO 2024-05-20: Move rendering code to separate section.*/
 /* Movies: in 3D, these are in a z=0 cross-section. */
-event output_interface (i += 50; t <= 0.5) {
+event output_interface (i += 25; t <= 0.5) {
     printf("start out inter\n");
     {
         char *videofile = NULL;

@@ -7,7 +7,7 @@
 #SBATCH --qos=standard
 #SBATCH --account=shahriar
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=32
+#SBATCH --ntasks-per-node=64
 #SBATCH --time=2:00:00
 #SBATCH --mem-per-cpu=4G
 
