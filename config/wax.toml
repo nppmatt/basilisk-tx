@@ -23,8 +23,8 @@ description = "Wax droplet falling on solid surface."
 #   i.e. 0.2 starts the drop "20% above the floor" relative to the max height.
 [drop]
     radius = 0.0025
-    velocity = 2.156
-    contact-angle = 90.0
+    velocity = 3.479
+    contact-angle = 70.0
     init-height = 0.15
 
 # Simulation parameters.
@@ -32,5 +32,5 @@ description = "Wax droplet falling on solid surface."
 # duration: Total time to simulate, in seconds.
 [sim]
     max-timestep = 1.0e-4
-    duration = 0.1
+    duration = 0.5
 

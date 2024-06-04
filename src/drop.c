@@ -55,7 +55,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
  */
 #define LEVEL 9
 const int maxlevel = LEVEL;
-const int minlevel = LEVEL - 4;
+const int minlevel = LEVEL - 5;
 
 
 /* Define default viscoelastic fields. */
@@ -97,6 +97,9 @@ toml_table_t* gas;
 toml_table_t* drop;
 toml_table_t* sim;
 
+/* Pass config file string to a global array. */
+char** gargv;
+
 static void tomlError(const char* msg, const char* msg1)
 {
     fprintf(stderr, "TOML PARSING ERROR: %s%s\n", msg, msg1?msg1:"");
@@ -105,6 +108,9 @@ static void tomlError(const char* msg, const char* msg1)
 
 int main(int argc, char** argv)
 {
+    printf("start main\n");
+    gargv = argv;
+
     FILE* configFile;
     char errbuf[256];
     /* For now, execution ought to be something like:
@@ -178,6 +184,7 @@ int main(int argc, char** argv)
 
     init_grid (1 << LEVEL);
     run();
+    printf("end main\n");
 }
 
 
@@ -240,32 +247,34 @@ event adapt (i++) {
 }
 #endif
 
-/**
-We track the normalized spreading diameter of the droplet. */
+/* We track the normalized spreading diameter of the droplet.*/
+/*
 event logfile (i += 1; t <= simDuration) {
     scalar pos[];
     position (f, pos, {1,0});
-    fprintf ( stderr, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );
+    fprintf ( stdout, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );
 }
+*/
 
 /* TODO 2024-05-20: Move rendering code to separate section.*/
 /* Movies: in 3D, these are in a z=0 cross-section. */
-/*
-event output_interface (i += 50; t <= 1) {
- 
-  {
-    char *outfile2 = NULL;
-    outfile2 = (char *) malloc(sizeof(char) * 256);
-    sprintf(outfile2, "interface/%d.out", i);
-    FILE * fp_interface = fopen (outfile2, "w");
-    output_facets (f, fp_interface);
-    fclose(fp_interface);
-  }
+event output_interface (i += 50; t <= 0.5) {
+    printf("start out inter\n");
+    {
+        char *videofile = NULL;
+        videofile = (char *) malloc(sizeof(char) * 256);
+        //sprintf(videofile, "data-out/%s/%d.out", gargv[1], i);
+        sprintf(videofile, "data-out/%d.out", i);
+        FILE * fp_interface = fopen (videofile, "w");
+        output_facets (f, fp_interface);
+        fclose(fp_interface);
+    }
 
-  {
-    static FILE * fp = popen ("ppm2mp4 f.mp4", "w");
-    output_ppm (f, fp, min = 0, max = 1, n = 512);
-  }
+    {
+        static FILE * fp = popen ("ppm2mp4 out.mp4", "w");
+        output_ppm (f, fp, min = 0, max = 1, n = 512);
+    }
+    printf("end out inter\n");
 
   //{
     //scalar l[];
@@ -275,7 +284,6 @@ event output_interface (i += 50; t <= 1) {
     //output_ppm (l, fp2, min = 5, max = 7, n = 512);
   //}
 }
-*/
 /**
 At equilibrium (t = 10 seems sufficient), we output the interface
 shape and compute the (constant) curvature. */

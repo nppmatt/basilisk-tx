@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OUT_DIR=out
+BIN_DIR=bin
 options=( "$OUT_DIR"/* )
 select option in "${options[@]}" "cancel"; do
 	case $option in
