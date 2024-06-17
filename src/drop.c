@@ -272,10 +272,14 @@ event logfile (i += 1; t <= simDuration) {
 
 /* TODO 2024-05-20: Move rendering code to separate section.*/
 /* Movies: in 3D, these are in a z=0 cross-section. */
-event output_interface (i += 25; t <= 0.5) {
+char *interfaceFile = NULL;
+char *movieFile = NULL;
+event define_output (t = 0) {
+    interfaceFile = (char *) malloc(sizeof(char) * 64);
+    movieFile = (char *) malloc(sizeof(char) * 64);
+}
+event output_interface (i += 25; t <= simDuration) {
     {
-        char *interfaceFile = NULL;
-        interfaceFile = (char *) malloc(sizeof(char) * 256);
         sprintf(interfaceFile, "out/%s/%d.out", name, i);
         FILE * fp_interface = fopen (interfaceFile, "w");
         output_facets (f, fp_interface);
@@ -283,8 +287,6 @@ event output_interface (i += 25; t <= 0.5) {
     }
 
     {
-        char *movieFile = NULL;
-        movieFile = (char *) malloc(sizeof(char) * 256);
         sprintf(movieFile, "ppm2mp4 %s.mp4", name);
         static FILE * fp = popen (movieFile, "w");
         output_ppm (f, fp, min = 0, max = 1, n = 512);
