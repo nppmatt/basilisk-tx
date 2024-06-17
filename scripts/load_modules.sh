@@ -1,4 +1,4 @@
-#!/bin/bash -l
+#!/usr/bin/env bash -l
 
 # 2024-05-20: Dependencies last pinned. Decided to keep it simple.
 

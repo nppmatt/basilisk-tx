@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #SBATCH -J basilisk_job
 #SBATCH -o slurm-out/slurm.out

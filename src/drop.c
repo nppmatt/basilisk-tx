@@ -16,7 +16,7 @@ gravity present).
 Note that small contact angles are not accessible yet (/src/contact.h).
 */
 
-/* For Cartesian mesh. */
+/* For 2D adaptive mesh. */
 //#include "grid/multigrid.h"
 
 /* For 3D adaptive mesh. */
@@ -38,25 +38,12 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 #include "include/toml.h"
 #include <errno.h>
 
+/* Directory creation. */
+#include <sys/stat.h>
+#include <sys/types.h>
+
 /* Smooth out jumps in density and viscosity. */
 #define FILTERED 1
-
-/* Viscoelastic properties used are the ratio of the solvent 
- * to the total viscoelastic viscosity (polymeric
- * plus solvent), BETA, and the relaxation time LAM.
- * BETA is non-dimensional.
- * LAM is the relaxation time in seconds.
- */
-#define BETA 1.0
-#define LAM 0.0
-
-/* We initialize the maximum and minimum levels of refinement.
- * Best results are given by max values of 9-10, min may be 4 under.
- */
-#define LEVEL 9
-const int maxlevel = LEVEL;
-const int minlevel = LEVEL - 5;
-
 
 /* Define default viscoelastic fields. */
 scalar lambdav[], mupv[];
@@ -67,7 +54,6 @@ scalar lambdav[], mupv[];
 u.n[top] = neumann(0);
 p[top]   = dirichlet(0);
 
-
 /**
 The wall is at the bottom side. We apply a no-slip boundary condition. */
 u.t[bottom] = dirichlet(0);          // Comment out for imposing slip boundary condition
@@ -75,7 +61,6 @@ u.t[bottom] = dirichlet(0);          // Comment out for imposing slip boundary c
 //u.n[bottom]  = dirichlet(0.);      // This is imposed by default
 //tau_qq[bottom] = dirichlet(0);     // This is the i=3, j=3 component of viscoelastic stress in axi-symmetric case
 //f[bottom] = neumann(0);            // This is for imposing fully non-wetting condition, i.e. theta0 = 180
-
 
 /* Drop experiment parameters. */
 double R0;
@@ -88,6 +73,21 @@ double velocity;
 vector h[];
 double theta0;
 
+/* Viscoelastic properties used are the ratio of the solvent 
+ * to the total viscoelastic viscosity (polymeric
+ * plus solvent), BETA, and the relaxation time LAM.
+ * BETA is non-dimensional.
+ * LAM is the relaxation time in seconds.
+ */
+double BETA;
+double LAM;
+
+/* We initialize the maximum and minimum levels of refinement.
+ * Best results are given by max values of 9-10, min may be 4 under.
+ */
+int maxLevel;
+int minLevel;
+
 /* How long the simulation will last. */
 double simDuration;
 
@@ -97,8 +97,9 @@ toml_table_t* gas;
 toml_table_t* drop;
 toml_table_t* sim;
 
-/* Pass config file string to a global array. */
-char** gargv;
+/* File naming parameters, for data export. */
+char *name = NULL;
+char *out_dir = NULL;
 
 static void tomlError(const char* msg, const char* msg1)
 {
@@ -108,9 +109,6 @@ static void tomlError(const char* msg, const char* msg1)
 
 int main(int argc, char** argv)
 {
-    printf("start main\n");
-    gargv = argv;
-
     FILE* configFile;
     char errbuf[256];
     /* For now, execution ought to be something like:
@@ -133,6 +131,14 @@ int main(int argc, char** argv)
     drop = toml_table_in(config, "drop");
     sim = toml_table_in(config, "sim");
 
+    /* Specify name of experiment and the directory it will go in. */
+    name = (char *) malloc(sizeof(char) * 256);
+    out_dir = (char *) malloc(sizeof(char) * 256);
+
+    name = (toml_string_in(config, "name")).u.s;
+    sprintf(out_dir, "out/%s", name);
+    mkdir(out_dir, 0755);
+
     /**
     We initialize the physical properties of the
     two-phase system and the gravity value, all in SI units.
@@ -145,7 +151,7 @@ int main(int argc, char** argv)
     mu2 = (double)(toml_double_in(gas, "mu")).u.d;
 
     /* Acceleration of gravity */
-    G.y = -9.807;
+    G.y = -9.80665;
 
     /* Set experiment parameters,
      * beginning with drop radius and the domain size dependent on it.
@@ -166,6 +172,14 @@ int main(int argc, char** argv)
     particular). */
     f.height = h;
 
+    /* Set viscoelastic polymer properties. */
+    BETA = (double)(toml_double_in(sim, "beta")).u.d;
+    LAM = (double)(toml_double_in(sim, "lam")).u.d;
+
+    /* Set grid level. */
+    maxLevel = (int)(toml_int_in(sim, "level")).u.i;
+    minLevel = maxLevel - 4;
+
     /* We set a maximum timestep, if needed for stability.
      * DT is an interpreted constant. Hence the indirect assignment.
      */
@@ -182,7 +196,7 @@ int main(int argc, char** argv)
     }
     */
 
-    init_grid (1 << LEVEL);
+    init_grid (1 << maxLevel);
     run();
     printf("end main\n");
 }
@@ -243,7 +257,7 @@ event snapshots (t += 1)
 We refine the region around the interface of the droplet. */
 #if TREE
 event adapt (i++) {
-    adapt_wavelet ({f,u.x,u.y}, (double []){1.0e-2, 1.0e-3, 1.0e-3}, maxlevel, minlevel);
+    adapt_wavelet ({f,u.x,u.y}, (double []){1.0e-2, 1.0e-3, 1.0e-3}, maxLevel, minLevel);
 }
 #endif
 
@@ -259,22 +273,22 @@ event logfile (i += 1; t <= simDuration) {
 /* TODO 2024-05-20: Move rendering code to separate section.*/
 /* Movies: in 3D, these are in a z=0 cross-section. */
 event output_interface (i += 25; t <= 0.5) {
-    printf("start out inter\n");
     {
-        char *videofile = NULL;
-        videofile = (char *) malloc(sizeof(char) * 256);
-        //sprintf(videofile, "data-out/%s/%d.out", gargv[1], i);
-        sprintf(videofile, "data-out/%d.out", i);
-        FILE * fp_interface = fopen (videofile, "w");
+        char *interfaceFile = NULL;
+        interfaceFile = (char *) malloc(sizeof(char) * 256);
+        sprintf(interfaceFile, "out/%s/%d.out", name, i);
+        FILE * fp_interface = fopen (interfaceFile, "w");
         output_facets (f, fp_interface);
         fclose(fp_interface);
     }
 
     {
-        static FILE * fp = popen ("ppm2mp4 out.mp4", "w");
+        char *movieFile = NULL;
+        movieFile = (char *) malloc(sizeof(char) * 256);
+        sprintf(movieFile, "ppm2mp4 %s.mp4", name);
+        static FILE * fp = popen (movieFile, "w");
         output_ppm (f, fp, min = 0, max = 1, n = 512);
     }
-    printf("end out inter\n");
 
   //{
     //scalar l[];

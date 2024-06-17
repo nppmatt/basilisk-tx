@@ -26,6 +26,10 @@ drop: $(SRC_DIR)/drop.c $(OBJ_DIR)/toml.o
 	@echo "Complete"
 	@echo "Run: ./bin/$@"
 
+.PHONY: run
+run:
+	source scripts/choose_job.sh
+
 .PHONY: clean
 clean:
 	rm $(BIN_DIR)/*
