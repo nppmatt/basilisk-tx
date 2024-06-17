@@ -278,7 +278,7 @@ event define_output (t = 0) {
     interfaceFile = (char *) malloc(sizeof(char) * 64);
     movieFile = (char *) malloc(sizeof(char) * 64);
 }
-event output_interface (i += 25; t <= simDuration) {
+event output_interface (i += 50; t <= simDuration) {
     {
         sprintf(interfaceFile, "out/%s/%d.out", name, i);
         FILE * fp_interface = fopen (interfaceFile, "w");
