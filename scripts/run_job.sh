@@ -18,7 +18,8 @@ source scripts/load_modules.sh
 echo "Modules loaded."
 
 # Run the file passed onto these parameters.
-echo "Passing $2 to $1"
+echo "[$(date +%D-%H:%M:%S)] $1 $2 START" >> log/job.log
 ./"$1" "$2"
+echo "[$(date +%D-%H:%M:%S)] $1 $2 END" >> log/job.log
 #mpirun -n $SLURM_NTASKS ./"$1"
 

@@ -13,6 +13,7 @@ LMOD=source scripts/load_modules.sh
 SRC_DIR:=src
 BIN_DIR:=bin
 OBJ_DIR:=obj
+OUT_DIR:=out
 INC_DIR:=$(SRC_DIR)/include
 
 toml: $(INC_DIR)/toml.h $(INC_DIR)/toml.c
@@ -33,4 +34,5 @@ run:
 .PHONY: clean
 clean:
 	rm $(BIN_DIR)/*
+	rm -r $(OUT_DIR)/*
 

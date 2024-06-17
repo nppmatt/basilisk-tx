@@ -79,8 +79,10 @@ double theta0;
  * BETA is non-dimensional.
  * LAM is the relaxation time in seconds.
  */
-double BETA;
-double LAM;
+//double BETA;
+//double LAM;
+#define BETA 1.0
+#define LAM 0.0
 
 /* We initialize the maximum and minimum levels of refinement.
  * Best results are given by max values of 9-10, min may be 4 under.
@@ -173,8 +175,8 @@ int main(int argc, char** argv)
     f.height = h;
 
     /* Set viscoelastic polymer properties. */
-    BETA = (double)(toml_double_in(sim, "beta")).u.d;
-    LAM = (double)(toml_double_in(sim, "lam")).u.d;
+    //BETA = (double)(toml_double_in(sim, "beta")).u.d;
+    //LAM = (double)(toml_double_in(sim, "lam")).u.d;
 
     /* Set grid level. */
     maxLevel = (int)(toml_int_in(sim, "level")).u.i;
