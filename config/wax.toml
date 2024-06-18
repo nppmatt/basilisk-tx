@@ -37,4 +37,6 @@ description = "Wax droplet falling on solid surface."
     level = 9
     max-timestep = 1.0e-4
     duration = 0.5
+    num-cpus = 64
+    max-compute-time = "2:00:00"
 

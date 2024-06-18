@@ -134,8 +134,8 @@ int main(int argc, char** argv)
     sim = toml_table_in(config, "sim");
 
     /* Specify name of experiment and the directory it will go in. */
-    name = (char *) malloc(sizeof(char) * 256);
-    out_dir = (char *) malloc(sizeof(char) * 256);
+    name = (char *) malloc(sizeof(char) * 64);
+    out_dir = (char *) malloc(sizeof(char) * 64);
 
     name = (toml_string_in(config, "name")).u.s;
     sprintf(out_dir, "out/%s", name);
