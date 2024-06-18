@@ -14,6 +14,7 @@ SRC_DIR:=src
 BIN_DIR:=bin
 OBJ_DIR:=obj
 OUT_DIR:=out
+SLURM_DIR:=slurm-out
 INC_DIR:=$(SRC_DIR)/include
 
 toml: $(INC_DIR)/toml.h $(INC_DIR)/toml.c
@@ -33,6 +34,16 @@ run:
 
 .PHONY: clean
 clean:
-	rm $(BIN_DIR)/*
+	rm $(SLURM_DIR)/*
 	rm -r $(OUT_DIR)/*
+
+.PHONY: deepclean
+deepclean:
+	rm $(OBJ_DIR)/*
+	rm $(BIN_DIR)/*
+	rm $(SLURM_DIR)/*
+	rm -r $(OUT_DIR)/*
+
+.PHONY: all
+all: | toml drop
 

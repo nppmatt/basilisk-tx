@@ -1,6 +1,6 @@
 # 2024-05-20 Prototype config/template for automating experiment parameter input.
 # Intended to be used with drop.c, will probably move materials into another config.
-name = "waxdrop"
+name = "wax-32c"
 description = "Wax droplet falling on solid surface."
 
 # Properties of the two fluids.
@@ -37,6 +37,6 @@ description = "Wax droplet falling on solid surface."
     level = 9
     max-timestep = 1.0e-4
     duration = 0.5
-    num-cpus = 64
-    max-compute-time = "2:00:00"
+    num-cpus = 32
+    max-compute-time = "24:00:00"
 
