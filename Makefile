@@ -1,14 +1,14 @@
 CC=qcc
 CFLAGS=-O2 -std=c99 -Wall -D_XOPEN_SOURCE=700
-MPIGEN=-source -D_MPI=1
 MPICC=mpicc
-MPIFLAGS=-O2 -std=c99 -Wall -D_MPI=1
+MPIFLAGS=-O2 -std=c99 -Wall -D_MPI=1 -D_XOPEN_SOURCE=700
 # 2024-04-03: OSMesa not needed? LINKFLAGS=-lfb_osmesa -lOSMesa -lm
 LINKFLAGS=-lm
 
 .PHONY: source
 SHELL:=/bin/bash
 LMOD=source scripts/load_modules.sh
+MPIGEN=source scripts/mpigen.sh
 
 SRC_DIR:=src
 BIN_DIR:=bin
@@ -22,11 +22,11 @@ toml: $(INC_DIR)/toml.h $(INC_DIR)/toml.c
 
 drop: $(SRC_DIR)/drop.c $(OBJ_DIR)/toml.o
 	$(LMOD); wait && \
-	$(CC) $(CFLAGS) -I$(INC_DIR) -c $< -o $(OBJ_DIR)/$@.o
-	$(CC) $(CFLAGS) -I$(INC_DIR) -autolink $(OBJ_DIR)/toml.o $(OBJ_DIR)/$@.o \
+	$(MPIGEN) $@.c
+	$(MPICC) $(MPIFLAGS) -I$(INC_DIR) -c $(SRC_DIR)/_$@.c -o $(OBJ_DIR)/$@.o
+	$(MPICC) $(MPIFLAGS) -I$(INC_DIR) $(OBJ_DIR)/toml.o $(OBJ_DIR)/$@.o \
 		-o $(BIN_DIR)/$@ $(LINKFLAGS)
 	@echo "Complete"
-	@echo "Run: ./bin/$@"
 
 .PHONY: run
 run:

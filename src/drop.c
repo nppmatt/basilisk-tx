@@ -17,9 +17,9 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 */
 
 /* For 2D adaptive mesh. */
-//#include "grid/multigrid.h"
+#include "grid/multigrid.h"
 
-/* For 3D adaptive mesh. */
+/* For 3D adaptive tree-based mesh. */
 //#include "grid/octree.h"
 
 #include "navier-stokes/centered.h"
