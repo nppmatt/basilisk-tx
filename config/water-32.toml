@@ -6,7 +6,7 @@ description = "Water droplet falling on solid surface."
 # Properties of the two fluids.
 # rho: density (kg/m^3)
 # mu: viscosity (Pa*s)
-# sigma: stress tensor constant (N/m^2 or Pa)
+# sigma: viscoelastic stress tensor constant (N/m^2 or Pa)
 [liquid]
     rho = 997.0
     mu = 0.0009
@@ -25,7 +25,7 @@ description = "Water droplet falling on solid surface."
 [drop]
     radius = 0.0025
     velocity = 3.479
-    contact-angle = 70.0
+    contact-angle = 71.0
     init-height = 0.15
 
 # Simulation parameters.
@@ -34,7 +34,7 @@ description = "Water droplet falling on solid surface."
 [sim]
     beta = 1.0
     lam = 0.0
-    level = 8
+    level = 9
     max-timestep = 1.0e-4
     duration = 0.5
     num-cpus = 32

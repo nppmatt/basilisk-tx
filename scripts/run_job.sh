@@ -27,5 +27,5 @@ mpirun -n $SLURM_NTASKS ./"$1" "$2"
 time_end=$(date +%s)
 time_diff=$(echo "scale=2; ($time_end - $time_start) / 3600" | bc)
 cost=$(echo "scale=1; $time_diff * $cpus" | bc)
-echo -e "[$(date +%D-%H:%M:%S)] END\t- $1 ($program_hash) $2 ($config_hash)\t- $cpus CPUs | $time_diff Hours | $cost SUs used" >> log/job.log
+echo -e "[$(date +%D-%H:%M:%S)] END  \t- $1 ($program_hash) $2 ($config_hash)\t- $cpus CPUs | $time_diff Hours | $cost SUs used" >> log/job.log
 
