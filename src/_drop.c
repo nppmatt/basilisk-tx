@@ -16133,14 +16133,14 @@ static int properties_1_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=
 #line 236 "drop.c"
       static int properties_1(const int i,const double t,Event *_ev){tracing("properties_1","drop.c",236); {
     foreach_stencil() {
-    _stencil_val_a(mupv,0,0,0);_stencil_val(f,0,0,0);    
-    _stencil_val_a(lambdav,0,0,0);_stencil_val(f,0,0,0);  
+        _stencil_val_a(mupv,0,0,0);_stencil_val(f,0,0,0);    
+        _stencil_val_a(lambdav,0,0,0);_stencil_val(f,0,0,0);  
     }end_foreach_stencil();
     {
 #line 237
 foreach() {
-    val(mupv,0,0,0) = 0.1*(1.0 - BETA)*clamp(val(f,0,0,0),0,1);
-    val(lambdav,0,0,0) = LAM*clamp(val(f,0,0,0),0,1);
+        val(mupv,0,0,0) = 0.1*(1.0 - BETA)*clamp(val(f,0,0,0),0,1);
+        val(lambdav,0,0,0) = LAM*clamp(val(f,0,0,0),0,1);
     }end_foreach();}
 }{end_tracing("properties_1","drop.c",241);return 0;}end_tracing("properties_1","drop.c",241);}
 #line 265

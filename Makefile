@@ -6,7 +6,7 @@ MPIFLAGS=-O2 -std=c99 -Wall -D_MPI=1 -D_XOPEN_SOURCE=700
 LINKFLAGS=-lm
 
 .PHONY: source
-SHELL:=/bin/bash
+SHELL:=/usr/bin/env bash
 LMOD=source scripts/load_modules.sh
 MPIGEN=source scripts/mpigen.sh
 
@@ -21,8 +21,9 @@ toml: $(INC_DIR)/toml.h $(INC_DIR)/toml.c
 	gcc $(CFLAGS) -I$(INC_DIR) -c $(INC_DIR)/$@.c -o $(OBJ_DIR)/$@.o
 
 drop: $(SRC_DIR)/drop.c $(OBJ_DIR)/toml.o
-	$(LMOD); wait && \
+	rm $(SRC_DIR)/_$@.c
 	$(MPIGEN) $@.c
+	$(LMOD); wait && \
 	$(MPICC) $(MPIFLAGS) -I$(INC_DIR) -c $(SRC_DIR)/_$@.c -o $(OBJ_DIR)/$@.o
 	$(MPICC) $(MPIFLAGS) -I$(INC_DIR) $(OBJ_DIR)/toml.o $(OBJ_DIR)/$@.o \
 		-o $(BIN_DIR)/$@ $(LINKFLAGS)
