@@ -1,12 +1,12 @@
 # 2024-05-20 Prototype config/template for automating experiment parameter input.
 # Intended to be used with drop.c, will probably move materials into another config.
-name = "water-32c"
+name = "water-128cL9"
 description = "Water droplet falling on solid surface."
 
 # Properties of the two fluids.
 # rho: density (kg/m^3)
 # mu: viscosity (Pa*s)
-# sigma: viscoelastic stress tensor constant (N/m^2 or Pa)
+# sigma: viscoelastic stress tensor constant (N/m)
 [liquid]
     rho = 997.0
     mu = 0.0009
@@ -32,11 +32,11 @@ description = "Water droplet falling on solid surface."
 # max-timestep: In seconds. Constrains solver adaptivity in temporal domain.
 # duration: Total time to simulate, in seconds.
 [sim]
-    beta = 1.0
+    beta = 0.5
     lam = 0.0
     level = 9
     max-timestep = 1.0e-4
     duration = 0.5
-    num-cpus = 32
+    num-cpus = 128
     max-compute-time = "4:00:00"
 

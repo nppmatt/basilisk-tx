@@ -44,6 +44,3 @@ deepclean:
 	rm $(SLURM_DIR)/*
 	rm -r $(OUT_DIR)/*
 
-.PHONY: all
-all: | toml drop
-

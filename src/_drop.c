@@ -16143,27 +16143,48 @@ foreach() {
     val(lambdav,0,0,0) = LAM*clamp(val(f,0,0,0),0,1);
     }end_foreach();}
 }{end_tracing("properties_1","drop.c",241);return 0;}end_tracing("properties_1","drop.c",241);}
-#line 275 "drop.c"
+#line 265
+static int logfile_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=( t <= simDuration)!=0;*ip=i;*tp=t;return ret;}static int logfile_expr1(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i += 1)!=0;*ip=i;*tp=t;return ret;}
+#line 265 "drop.c"
+      static int logfile(const int i,const double t,Event *_ev){tracing("logfile","drop.c",265); {
+    scalar  pos=new_scalar("pos");
+    position (f, pos,
+#line 736 "/home/mc462/basilisk/src/curvature.h"
+(
+        
+#line 736
+coord) 
+#line 267 "drop.c"
+{1,0}
+#line 736 "/home/mc462/basilisk/src/curvature.h"
+,( coord) {0}, false
+#line 267 "drop.c"
+);
+    fprintf ( fout, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );delete((scalar*)((scalar[]){pos,{-1}}));
+}{end_tracing("logfile","drop.c",269);return 0;}end_tracing("logfile","drop.c",269);}
+
+
+
 char *interfaceFile = NULL;
 char *movieFile = NULL;
 static int define_output_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(t = 0)!=0;*ip=i;*tp=t;return ret;}
 
-#line 277
-      static int define_output(const int i,const double t,Event *_ev){tracing("define_output","drop.c",277); {
+#line 275
+      static int define_output(const int i,const double t,Event *_ev){tracing("define_output","drop.c",275); {
     interfaceFile = (char *) pmalloc(sizeof(char) * 64,__func__,__FILE__,__LINE__);
     movieFile = (char *) pmalloc(sizeof(char) * 64,__func__,__FILE__,__LINE__);
-}{end_tracing("define_output","drop.c",280);return 0;}end_tracing("define_output","drop.c",280);}
+}{end_tracing("define_output","drop.c",278);return 0;}end_tracing("define_output","drop.c",278);}
 static int output_interface_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=( t <= simDuration)!=0;*ip=i;*tp=t;return ret;}static int output_interface_expr1(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i += 50)!=0;*ip=i;*tp=t;return ret;}
 
-#line 281
-      static int output_interface(const int i,const double t,Event *_ev){tracing("output_interface","drop.c",281); {
+#line 279
+      static int output_interface(const int i,const double t,Event *_ev){tracing("output_interface","drop.c",279); {
     {
         sprintf(interfaceFile, "out/%s/%d.out", name, i);
         FILE * fp_interface = fopen (interfaceFile, "w");
         output_facets (f, fp_interface
 #line 510 "/home/mc462/basilisk/src/fractions.h"
 ,( vector) {{-1}}
-#line 285 "drop.c"
+#line 283 "drop.c"
 );
         fclose(fp_interface);
     }
@@ -16175,7 +16196,7 @@ static int output_interface_expr0(int *ip,double *tp,Event *_ev){int i=*ip;doubl
 #line 553 "/home/mc462/basilisk/src/output.h"
 , 
 NULL
-#line 292 "drop.c"
+#line 290 "drop.c"
 , 0, 1
 #line 555 "/home/mc462/basilisk/src/output.h"
 , 5, 
@@ -16191,11 +16212,11 @@ double[2][2]) {{X0, Y0}, {X0 + L0, Y0 + L0}},
 scalar) {-1}, 
 jet, 
 NULL
-#line 292 "drop.c"
+#line 290 "drop.c"
 );
     }
-#line 302 "drop.c"
-}{end_tracing("output_interface","drop.c",302);return 0;}end_tracing("output_interface","drop.c",302);}
+#line 300 "drop.c"
+}{end_tracing("output_interface","drop.c",300);return 0;}end_tracing("output_interface","drop.c",300);}
 #line 2 "ast/init_solver.h"
 
 static void _init_solver (void)
@@ -16245,12 +16266,22 @@ event_register((Event){0,1,init_0,{init_0_expr0},((int *)0),((double *)0),"/home
 event_register((Event){0,1,defaults_4,{defaults_4_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/log-conform.h",142,"defaults"});  
 #line 207 "drop.c"
 event_register((Event){0,1,init_1,{init_1_expr0},((int *)0),((double *)0),"drop.c",207,"init"});  
-#line 277
-event_register((Event){0,1,define_output,{define_output_expr0},((int *)0),((double *)0),"drop.c",277,"define_output"});  
+#line 265
+event_register((Event){0,2,logfile,{logfile_expr0,logfile_expr1},((int *)0),((double *)0),"drop.c",265,"logfile"});  
 
 
 
-event_register((Event){0,2,output_interface,{output_interface_expr0,output_interface_expr1},((int *)0),((double *)0),"drop.c",281,"output_interface"});
+
+
+
+
+
+
+event_register((Event){0,1,define_output,{define_output_expr0},((int *)0),((double *)0),"drop.c",275,"define_output"});  
+
+
+
+event_register((Event){0,2,output_interface,{output_interface_expr0,output_interface_expr1},((int *)0),((double *)0),"drop.c",279,"output_interface"});
 	
 	
 	
