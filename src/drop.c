@@ -287,7 +287,7 @@ event output_interface (i += 50; t <= simDuration) {
     {
         sprintf(movieFile, "ppm2mp4 %s.mp4", name);
         static FILE * fp = popen (movieFile, "w");
-        output_ppm (f, fp, min = 0, max = 1, n = 512);
+        output_ppm (f, fp, min = 0, max = 1, n = 1024);
     }
 
   //{

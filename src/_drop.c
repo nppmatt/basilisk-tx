@@ -16192,7 +16192,7 @@ static int output_interface_expr0(int *ip,double *tp,Event *_ev){int i=*ip;doubl
     {
         sprintf(movieFile, "ppm2mp4 %s.mp4", name);
         static FILE * fp =NULL;if(!fp||i==0)fp=pid()>0?fopen("/dev/null","w"): qpopen (movieFile, "w");
-        output_ppm (f, fp, 512
+        output_ppm (f, fp, 1024
 #line 553 "/home/mc462/basilisk/src/output.h"
 , 
 NULL
