@@ -1,25 +1,25 @@
 # 2024-05-20 Prototype config/template for automating experiment parameter input.
 # Intended to be used with drop.c, will probably move materials into another config.
-name = "wax-32c"
-description = "Wax droplet falling on solid surface."
+name = "water-32c"
+description = "Water droplet falling on solid surface."
 
 # Properties of the two fluids.
-# rho: density
-# mu: viscosity
-# sigma: shear stress constant
+# rho: density (kg/m^3)
+# mu: viscosity (Pa*s)
+# sigma: stress tensor constant (N/m^2 or Pa)
 [liquid]
     rho = 997.0
-    mu = 0.1
-    sigma = 0.03
+    mu = 0.0009
+    sigma = 0.072
 
 [gas]
-    rho = 1.225
-    mu = 1.0e-5
+    rho = 1.20
+    mu = 1.82e-5
 
 # Experiment parameters.
 # radius: Droplet radius in meters.
-# velocity: Droplet velocity (signed vertical for now) in m/s.
-# contact-angle: What contact angle contrains the fluid boundary, in degrees.
+# velocity: Droplet velocity (signed quantity along vertical axis for now) in m/s.
+# contact-angle: What contact angle constrains the fluid boundary, in degrees.
 # init-height: Initial height expressed as a ratio of the vertical domain.
 #   i.e. 0.2 starts the drop "20% above the floor" relative to the max height.
 [drop]
@@ -34,9 +34,9 @@ description = "Wax droplet falling on solid surface."
 [sim]
     beta = 1.0
     lam = 0.0
-    level = 9
+    level = 8
     max-timestep = 1.0e-4
     duration = 0.5
     num-cpus = 32
-    max-compute-time = "24:00:00"
+    max-compute-time = "4:00:00"
 

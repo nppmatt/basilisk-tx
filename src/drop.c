@@ -262,13 +262,11 @@ event adapt (i++) {
 #endif
 
 /* We track the normalized spreading diameter of the droplet.*/
-/*
 event logfile (i += 1; t <= simDuration) {
     scalar pos[];
     position (f, pos, {1,0});
     fprintf ( stdout, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );
 }
-*/
 
 /* TODO 2024-05-20: Move rendering code to separate section.*/
 /* Movies: in 3D, these are in a z=0 cross-section. */
