@@ -244,7 +244,7 @@ event acceleration (i++) {
 event properties (i++) {
     foreach() {
         /* Apply polymeric viscosity of the drop. */
-        mupv[] = 0.01*(1.0 - BETA)*clamp(f[],0,1);
+        mupv[] = 0.001*(1.0 - BETA)*clamp(f[],0,1);
         /* Apply relaxation time of drop. */
         lambdav[] = LAM*clamp(f[],0,1);
     }
