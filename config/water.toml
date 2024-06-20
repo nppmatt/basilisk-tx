@@ -34,7 +34,7 @@ description = "Water droplet falling on an acrylic (PMMA) surface."
 [sim]
     beta = 0.0
     lam = 0.0
-    level = 9
+    level = 8
     max-timestep = 1.0e-4
     duration = 0.5
     num-cpus = 64

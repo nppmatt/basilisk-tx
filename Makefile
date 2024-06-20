@@ -35,13 +35,13 @@ run:
 
 .PHONY: clean
 clean:
-	rm -f *.mp4
+	git rm -f *.mp4
 	rm -f $(SLURM_DIR)/*
 	rm -rf $(OUT_DIR)/*
 
 .PHONY: deepclean
 deepclean:
-	rm -f *.mp4
+	git rm -f *.mp4
 	rm -f $(SLURM_DIR)/*
 	rm -rf $(OUT_DIR)/*
 	rm -f $(OBJ_DIR)/*
