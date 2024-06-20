@@ -16137,7 +16137,7 @@ static int properties_1_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=
 #line 245
 foreach() {
 
-        val(mupv,0,0,0) = 0.1*(1.0 - BETA)*clamp(val(f,0,0,0),0,1);
+        val(mupv,0,0,0) = (1.0 - BETA)*clamp(val(f,0,0,0),0,1);
 
         val(lambdav,0,0,0) = LAM*clamp(val(f,0,0,0),0,1);
     }end_foreach();}
