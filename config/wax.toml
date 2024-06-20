@@ -37,6 +37,6 @@ description = "Wax droplet falling on acrylic (PMMA) surface."
     level = 8
     max-timestep = 1.0e-4
     duration = 0.5
-    num-cpus = 64
+    num-cpus = 32
     max-compute-time = "2:00:00"
 
