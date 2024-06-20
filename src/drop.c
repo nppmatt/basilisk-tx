@@ -17,7 +17,7 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 */
 
 /* For 2D adaptive mesh. */
-#include "grid/multigrid.h"
+//#include "grid/multigrid.h"
 
 /* For 3D adaptive tree-based mesh. */
 //#include "grid/octree.h"
@@ -219,8 +219,7 @@ event init (t = 0)
     initHeight = (double)(toml_double_in(drop, "init-height")).u.d;
     fraction (f, - (sq(x) + sq(y - initHeight*L0) - sq(R0)));
 
-    /**
-    The initial velocity of the droplet is -1.0 (m/s) */
+    /* Set the initial velocity of the droplet. */
     foreach()
     u.y[] = -f[] * velocity;
 }
@@ -287,7 +286,7 @@ event output_interface (i += 50; t <= simDuration) {
     {
         sprintf(movieFile, "ppm2mp4 %s.mp4", name);
         static FILE * fp = popen (movieFile, "w");
-        output_ppm (f, fp, min = 0, max = 1, n = 1024);
+        output_ppm (f, fp, min = 0, max = 1, n = 640);
     }
 
   //{
