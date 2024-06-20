@@ -1,7 +1,7 @@
 CC=qcc
 CFLAGS=-O2 -std=c99 -Wall -D_XOPEN_SOURCE=700
 MPICC=mpicc
-MPIFLAGS=-O2 -std=c99 -Wall -D_MPI=8 -D_XOPEN_SOURCE=700
+MPIFLAGS=-O2 -std=c99 -Wall -D_MPI=1 -D_XOPEN_SOURCE=700
 # 2024-04-03: OSMesa not needed? LINKFLAGS=-lfb_osmesa -lOSMesa -lm
 LINKFLAGS=-lm
 
