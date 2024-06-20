@@ -1054,18 +1054,9 @@ bool input, output;
 void (* prolongation) (Point, scalar);
   void (* restriction) (Point, scalar);
   
-#line 9 "/home/mc462/basilisk/src/grid/tree-common.h"
-void (* refine) (Point, scalar);
-  
-#line 97
-void (* coarsen) (Point, scalar);
-  
 #line 28 "/home/mc462/basilisk/src/vof.h"
 scalar * tracers, c;
   bool inverse;
-  
-#line 81 "/home/mc462/basilisk/src/fractions.h"
-vector n;
   
 #line 456 "/home/mc462/basilisk/src/heights.h"
 vector height;
@@ -1950,441 +1941,17 @@ pfree (listf.y,__func__,__FILE__,__LINE__);
 }
 #line 1449 "/home/mc462/basilisk/src/common.h"
 #line 14 "drop-cpp.c"
-#line 1 "grid/quadtree.h"
-#line 1 "/home/mc462/basilisk/src/grid/quadtree.h"
-
-
-#line 1 "grid/tree.h"
-#line 1 "/home/mc462/basilisk/src/grid/tree.h"
-#line 1 "grid/mempool.h"
-#line 1 "/home/mc462/basilisk/src/grid/mempool.h"
-
-
-
-
-
-typedef struct _Pool Pool;
-
-struct _Pool {
-  Pool * next;
-};
-
-typedef struct {
-  char * first, * lastb;
-  size_t size;
-  size_t poolsize;
-  Pool * pool, * last;
-} Mempool;
-
-typedef struct {
-  char * next;
-} FreeBlock;
-
-Mempool * mempool_new (size_t poolsize, size_t size)
-{
-
-  if (!(poolsize % 8 == 0)) qassert ("/home/mc462/basilisk/src/grid/mempool.h", 26, "poolsize % 8 == 0");
-  if (!(size >= sizeof(FreeBlock))) qassert ("/home/mc462/basilisk/src/grid/mempool.h", 27, "size >= sizeof(FreeBlock)");
-
-
-  poolsize = min(1 << 20, poolsize + sizeof(Pool));
-  Mempool * m = ((Mempool *) pcalloc (1, sizeof(Mempool),__func__,__FILE__,__LINE__));
-  m->poolsize = poolsize;
-  m->size = size;
-  return m;
-}
-
-void mempool_destroy (Mempool * m)
-{
-  Pool * p = m->pool;
-  while (p) {
-    Pool * next = p->next;
-    pfree (p,__func__,__FILE__,__LINE__);
-    p = next;
-  }
-  pfree (m,__func__,__FILE__,__LINE__);
-}
-
-void * mempool_alloc (Mempool * m)
-{
-  if (!m->first) {
-
-    Pool * p = (Pool *) pmalloc (m->poolsize,__func__,__FILE__,__LINE__);
-    p->next = NULL;
-    if (m->last)
-      m->last->next = p;
-    else
-      m->pool = p;
-    m->last = p;
-    m->first = m->lastb = ((char *)m->last) + sizeof(Pool);
-    FreeBlock * b = (FreeBlock *) m->first;
-    b->next = NULL;
-  }
-  void * ret = m->first;
-  FreeBlock * b = (FreeBlock *) ret;
-  char * next = b->next;
-  if (!next) {
-    m->lastb += m->size;
-    next = m->lastb;
-    if (next + m->size > ((char *) m->last) + m->poolsize)
-      next = NULL;
-    else {
-      FreeBlock * b = (FreeBlock *) next;
-      b->next = NULL;
-    }
-  }
-  m->first = next;
-#if TRASH
-  double * v = (double *) ret;
-  for (int i = 0; i < m->size/sizeof(double); i++)
-    v[i] = undefined;
-#endif
-  return ret;
-}
-
-void * mempool_alloc0 (Mempool * m)
-{
-  void * ret = mempool_alloc (m);
-  memset (ret, 0, m->size);
-  return ret;
-}
-
-void mempool_free (Mempool * m, void * p)
-{
-#if TRASH
-  double * v = (double *) p;
-  for (int i = 0; i < m->size/sizeof(double); i++)
-    v[i] = undefined;
-#endif
-  FreeBlock * b = (FreeBlock *) p;
-  b->next = m->first;
-  m->first = (char *) p;
-}
-#line 2 "/home/mc462/basilisk/src/grid/tree.h"
-
-
-
-
-#line 1 "grid/memindex/range.h"
-#line 1 "/home/mc462/basilisk/src/grid/memindex/range.h"
-#line 15 "/home/mc462/basilisk/src/grid/memindex/range.h"
-typedef struct {
-  void ** p;
-  int size;
-} Memalloc;
-
-typedef struct {
-  int start, end;
-} Memrange;
-#line 34 "/home/mc462/basilisk/src/grid/memindex/range.h"
-void memrange_alloc (Memrange * r, Memalloc * mem, int i)
-{
-  if (r->start == r->end) {
-    r->start = i;
-    r->end = i + 1;
-    for (Memalloc * m = mem; m->p; m++) {
-      *m->p = pcalloc (1, m->size,__func__,__FILE__,__LINE__);
-      *m->p = (char *)(*m->p) - i*m->size;
-    }
-  }
-  else if (i >= r->end) {
-    for (Memalloc * m = mem; m->p; m++) {
-      *m->p = prealloc ((char *)(*m->p) + r->start*m->size,
-         m->size*(i + 1 - r->start),__func__,__FILE__,__LINE__);
-      *m->p = (char *)(*m->p) - r->start*m->size;
-      memset ((char *)(*m->p) + r->end*m->size, 0, (i - r->end + 1)*m->size);
-    }
-    r->end = i + 1;
-  }
-  else if (i < r->start) {
-    for (Memalloc * m = mem; m->p; m++) {
-      *m->p = prealloc ((char *)(*m->p) + r->start*m->size, m->size*(r->end - i),__func__,__FILE__,__LINE__);
-      memmove ((char *)(*m->p) + (r->start - i)*m->size, *m->p,
-        m->size*(r->end - r->start));
-      memset ((char *)(*m->p), 0, (r->start - i)*m->size);
-      *m->p = (char *)(*m->p) - i*m->size;
-    }
-    r->start = i;
-  }
-}
-#line 73 "/home/mc462/basilisk/src/grid/memindex/range.h"
-bool memrange_free (Memrange * r, Memalloc * mem, int i)
-{
-  if (i == r->start) {
-    if (i == r->end - 1) {
-      for (Memalloc * m = mem; m->p; m++) {
- pfree ((char *)(*m->p) + r->start*m->size,__func__,__FILE__,__LINE__);
- *m->p = NULL;
-      }
-      r->start = r->end = 0;
-      return true;
-    }
-    else {
-      for (i = i + 1; i < r->end &&
-      !*(void **)((char *)(*mem->p) + i*mem->size); i++);
-      for (Memalloc * m = mem; m->p; m++) {
- memmove ((char *)(*m->p) + r->start*m->size,
-   (char *)(*m->p) + i*m->size, m->size*(r->end - i));
- *m->p = prealloc ((char *)(*m->p) + r->start*m->size,
-    m->size*(r->end - i),__func__,__FILE__,__LINE__);
- *m->p = (char *)(*m->p) - i*m->size;
-      }
-      r->start = i;
-    }
-  }
-  else if (i == r->end - 1) {
-    for (i = i - 1; i >= r->start &&
-    !*(void **)((char *)(*mem->p) + i*mem->size); i--);
-    r->end = i + 1;
-    for (Memalloc * m = mem; m->p; m++) {
-      *m->p = prealloc ((char *)(*m->p) + r->start*m->size,
-         m->size*(r->end - r->start),__func__,__FILE__,__LINE__);
-      *m->p = (char *)(*m->p) - r->start*m->size;
-    }
-  }
-  else {
-    if (!(i > r->start && i < r->end)) qassert ("/home/mc462/basilisk/src/grid/memindex/range.h", 108, "i > r->start && i < r->end");
-    for (Memalloc * m = mem; m->p; m++)
-      memset ((char *)(*m->p) + i*m->size, 0, m->size);
-  }
-  return false;
-}
-
-
-
-
-
-
-
-struct _Memindex {
-  Memrange r1;
-
-  Memrange * r2;
-
-
-
-
-
-
-
-  char *** b;
-
-
-
-};
-#line 171 "/home/mc462/basilisk/src/grid/memindex/range.h"
-struct _Memindex * mem_new (int len)
-{
-  struct _Memindex * m = pcalloc (1, sizeof (struct _Memindex),__func__,__FILE__,__LINE__);
-  return m;
-}
-
-
-
-
-
-void mem_destroy (struct _Memindex * m, int len)
-{
-
-  for (int i = m->r1.start; i < m->r1.end; i++)
-    if (m->b[i]) {
-
-
-
-
-
-
-      pfree (m->b[i] + m->r2[i].start,__func__,__FILE__,__LINE__);
-    }
-  if (m->b) {
-    pfree (m->r2 + m->r1.start,__func__,__FILE__,__LINE__);
-
-
-
-  }
-
-  if (m->b)
-    pfree (m->b + m->r1.start,__func__,__FILE__,__LINE__);
-  pfree (m,__func__,__FILE__,__LINE__);
-}
-#line 218 "/home/mc462/basilisk/src/grid/memindex/range.h"
-void mem_assign (struct _Memindex * m, int i, int j, int len, void * b)
-{
-  Memalloc mem[] = {{(void **)&m->b, sizeof(char **)},
-      {(void **)&m->r2, sizeof(Memrange)},
-      {NULL}};
-  memrange_alloc (&m->r1, mem, i);
-  Memalloc mem1[] = {{(void **)&m->b[i], sizeof(char *)},
-       {NULL}};
-  memrange_alloc (&m->r2[i], mem1, j);
-  ((m)->b[i][j]) = b;
-}
-#line 259 "/home/mc462/basilisk/src/grid/memindex/range.h"
-void mem_free (struct _Memindex * m, int i, int j, int len)
-{
-  Memalloc mem[] = {{(void **)&m->b[i], sizeof(char *)},
-      {NULL}};
-  if (memrange_free (&m->r2[i], mem, j)) {
-    Memalloc mem[] = {{(void **)&m->b, sizeof(char **)},
-        {(void **)&m->r2, sizeof(Memrange)},
-        {NULL}};
-    memrange_free (&m->r1, mem, i);
-  }
-}
-#line 305 "/home/mc462/basilisk/src/grid/memindex/range.h"
-#define foreach_mem(_m, _len, _i) {\
-  Point point = {0};\
-  for (point.i = max(Period.x*2, (_m)->r1.start);\
-       point.i < min(_len - Period.x*2, (_m)->r1.end);\
-       point.i += _i)\
-    if ((_m)->b[point.i])\
-      for (point.j = max(Period.y*2, (_m)->r2[point.i].start);\
-    point.j < min(_len - Period.y*2, (_m)->r2[point.i].end);\
-    point.j += _i)\
- if ((_m)->b[point.i][point.j]) {\
-
-#line 315
-
-#define end_foreach_mem() }}
-#line 7 "/home/mc462/basilisk/src/grid/tree.h"
-#line 24 "/home/mc462/basilisk/src/grid/tree.h"
-typedef struct {
-  unsigned short flags;
-
-  unsigned short neighbors;
-  int pid;
-} Cell;
-
-enum {
-  active = 1 << 0,
-  leaf = 1 << 1,
-  border = 1 << 2,
-  vertex = 1 << 3,
-  user = 4,
-
-  face_x = 1 << 0
-
-  , face_y = 1 << 1
-
-
-
-
-};
-
-#define is_active(cell) ((cell).flags & active)
-#define is_leaf(cell) ((cell).flags & leaf)
-#define is_coarse() ((cell).neighbors > 0)
-#define is_border(cell) ((cell).flags & border)
-#define is_local(cell) ((cell).pid == pid())
-#define is_vertex(cell) ((cell).flags & vertex)
-
-
-
-typedef struct {
-  int i;
-
-  int j;
-
-
-
-
-} IndexLevel;
-
-typedef struct {
-  IndexLevel * p;
-  int n, nm;
-} CacheLevel;
-
-typedef struct {
-  int i;
-
-  int j;
-
-
-
-
-  int level, flags;
-} Index;
-
-typedef struct {
-  Index * p;
-  int n, nm;
-} Cache;
-
-
-
-typedef struct {
-  struct _Memindex * m;
-  Mempool * pool;
-  long nc;
-  int len;
-} Layer;
-
-static size_t _size (size_t depth)
-{
-  return (1 << depth) + 2*2;
-}
-
-static size_t poolsize (size_t depth, size_t size)
-{
-
-
-
-
-  return sq(_size(depth))*size;
-
-
-
-}
-
-static Layer * new_layer (int depth)
-{
-  Layer * l = ((Layer *) pmalloc ((1)*sizeof(Layer),__func__,__FILE__,__LINE__));
-  l->len = _size (depth);
-  if (depth == 0)
-    l->pool = NULL;
-  else {
-    size_t size = sizeof(Cell) + datasize;
-
-
-    l->pool = mempool_new (poolsize (depth, size), (1 << 2)*size);
-  }
-  l->m = mem_new (l->len);
-  l->nc = 0;
-  return l;
-}
-
-static void destroy_layer (Layer * l)
-{
-  if (l->pool)
-    mempool_destroy (l->pool);
-  mem_destroy (l->m, l->len);
-  pfree (l,__func__,__FILE__,__LINE__);
-}
-
-
-
+#line 1 "drop.c"
+#line 20 "drop.c"
+#line 1 "grid/multigrid.h"
+#line 1 "/home/mc462/basilisk/src/grid/multigrid.h"
+#line 16 "/home/mc462/basilisk/src/grid/multigrid.h"
 typedef struct {
   Grid g;
-  Layer ** L;
-
-  Cache leaves;
-  Cache faces;
-  Cache vertices;
-  Cache refined;
-  CacheLevel * active;
-  CacheLevel * prolongation;
-  CacheLevel * boundary;
-
-  CacheLevel * restriction;
-
-  bool dirty;
-} Tree;
-
-
+  char ** d;
+} Multigrid;
 
 struct _Point {
-
   int i;
 
   int j;
@@ -2392,7 +1959,7 @@ struct _Point {
 
 
 
-  int level;
+  int level, n;
 #ifdef foreach_block
   int l;
   #define _BLOCK_INDEX , point.l
@@ -2401,140 +1968,136 @@ struct _Point {
 #endif
 };
 static Point last_point;
-
-
-
-static void cache_level_append (CacheLevel * c, Point p)
+#line 49 "/home/mc462/basilisk/src/grid/multigrid.h"
+static size_t _size (size_t l)
 {
-  if (c->n >= c->nm) {
-    c->nm += 128;
-    c->p = (IndexLevel *) prealloc (c->p, (c->nm)*sizeof(IndexLevel),__func__,__FILE__,__LINE__);
-  }
-  c->p[c->n].i = p.i;
-
-  c->p[c->n].j = p.j;
-
-
-
-
-  c->n++;
+  size_t n = (1 << l) + 2*2;
+  return sq(n);
 }
+#line 62 "/home/mc462/basilisk/src/grid/multigrid.h"
+#define data(k,l,m)\
+  ((double *)&((Multigrid *)grid)->d[point.level][((point.i + k)*((1 << point.level) +\
+       2*2) +\
+      (point.j + l))*datasize]) 
+#line 64
 
-static void cache_level_shrink (CacheLevel * c)
-{
-  if (c->nm > (c->n/128 + 1)*128) {
-    c->nm = (c->n/128 + 1)*128;
-    if (!(c->nm > c->n)) qassert ("/home/mc462/basilisk/src/grid/tree.h", 200, "c->nm > c->n");
-    c->p = (IndexLevel *) prealloc (c->p, sizeof (Index)*c->nm,__func__,__FILE__,__LINE__);
-  }
-}
+#line 89 "/home/mc462/basilisk/src/grid/multigrid.h"
+#define allocated(k,l,m) (point.i+k >= 0 && point.i+k < (1 << point.level) + 2*2 &&\
+         point.j+l >= 0 && point.j+l < (1 << point.level) + 2*2)\
 
-static void cache_append (Cache * c, Point p, unsigned short flags)
-{
-  if (c->n >= c->nm) {
-    c->nm += 128;
-    c->p = (Index *) prealloc (c->p, (c->nm)*sizeof(Index),__func__,__FILE__,__LINE__);
-  }
-  c->p[c->n].i = p.i;
-
-  c->p[c->n].j = p.j;
+#line 91
 
 
+#define allocated_child(k,l,m) (level < depth() &&\
+         point.i > 0 && point.i <= (1 << point.level) + 2 &&\
+         point.j > 0 && point.j <= (1 << point.level) + 2)\
 
+#line 96
 
-  c->p[c->n].level = p.level;
-  c->p[c->n].flags = flags;
-  c->n++;
-}
-
-void cache_shrink (Cache * c)
-{
-  cache_level_shrink ((CacheLevel *)c);
-}
-#line 243 "/home/mc462/basilisk/src/grid/tree.h"
-#define allocated(k,l,n) (((point.i+k) >= (((Tree *)grid)->L[point.level]->m)->r1.start && (point.i+k) < (((Tree *)grid)->L[point.level]->m->r1.end) && (((Tree *)grid)->L[point.level]->m)->b[point.i+k] && (point.j+l) >= (((Tree *)grid)->L[point.level]->m)->r2[point.i+k].start && (point.j+l) < (((Tree *)grid)->L[point.level]->m)->r2[point.i+k].end && (((Tree *)grid)->L[point.level]->m)->b[point.i+k][point.j+l])\
-                               )\
-
-#line 245
-
-#define NEIGHBOR(k,l,n) (((((Tree *)grid)->L[point.level]->m)->b[point.i+k][point.j+l])\
-                            )\
-
-#line 248
-
-#define PARENT(k,l,n) (((((Tree *)grid)->L[point.level-1]->m)->b[(point.i+2)/2+k][(point.j+2)/2+l])\
-                                                    )\
-
-#line 251
-
-#define allocated_child(k,l,n) (level < depth() &&\
-         ((2*point.i-2 +k) >= (((Tree *)grid)->L[point.level+1]->m)->r1.start && (2*point.i-2 +k) < (((Tree *)grid)->L[point.level+1]->m->r1.end) && (((Tree *)grid)->L[point.level+1]->m)->b[2*point.i-2 +k] && (2*point.j-2 +l) >= (((Tree *)grid)->L[point.level+1]->m)->r2[2*point.i-2 +k].start && (2*point.j-2 +l) < (((Tree *)grid)->L[point.level+1]->m)->r2[2*point.i-2 +k].end && (((Tree *)grid)->L[point.level+1]->m)->b[2*point.i-2 +k][2*point.j-2 +l])\
-\
-                             )\
-
-#line 256
-
-#define CHILD(k,l,n) (((((Tree *)grid)->L[point.level+1]->m)->b[2*point.i-2 +k][2*point.j-2 +l])\
-                                                )\
-
-#line 259
-
-#line 284 "/home/mc462/basilisk/src/grid/tree.h"
-#define CELL(m) (*((Cell *)(m)))
-
-
+#line 117 "/home/mc462/basilisk/src/grid/multigrid.h"
 #define depth() (grid->depth)
-#define aparent(k,l,n) CELL(PARENT(k,l,n))
-#define child(k,l,n) CELL(CHILD(k,l,n))
+#line 136 "/home/mc462/basilisk/src/grid/multigrid.h"
+#define fine(a,k,l,m)\
+  ((double *)\
+   &((Multigrid *)grid)->d[point.level+1][((2*point.i-2 +k)*2*((1 << point.level) +\
+        2) +\
+     (2*point.j-2 +l))*datasize])[_index(a,m)]\
 
+#line 141
 
-#define cell CELL(NEIGHBOR(0,0,0))
-#define neighbor(k,l,n) CELL(NEIGHBOR(k,l,n))
-#define neighborp(l,m,n) (Point) {\
-    point.i + l,\
-\
-    point.j + m,\
-\
-\
-\
-\
-    point.level\
-    _BLOCK_INDEX\
-}\
+#define coarse(a,k,l,m)\
+  ((double *)\
+   &((Multigrid *)grid)->d[point.level-1][(((point.i+2)/2+k)*((1 << point.level)/2 +\
+        2*2) +\
+     (point.j+2)/2+l)*datasize])[_index(a,m)]\
 
-#line 305
-
-
-
-#define data(k,l,n) ((double *) (NEIGHBOR(k,l,n) + sizeof(Cell)))
-#define fine(a,k,p,n) ((double *) (CHILD(k,p,n) + sizeof(Cell)))[_index(a,n)]
-#define coarse(a,k,p,n) ((double *) (PARENT(k,p,n) + sizeof(Cell)))[_index(a,n)]
+#line 147
 
 #define POINT_VARIABLES\
   VARIABLES\
   int level = point.level; NOT_UNUSED(level);\
-\
-\
-\
   struct { int x, y; } child = {\
     2*((point.i+2)%2)-1, 2*((point.j+2)%2)-1\
-  };\
-\
-\
-\
-\
-\
-  NOT_UNUSED(child);\
+  }; NOT_UNUSED(child);\
   Point parent = point; NOT_UNUSED(parent);\
   parent.level--;\
-  parent.i = (point.i + 2)/2;\
+  parent.i = (point.i + 2)/2; parent.j = (point.j + 2)/2;\
+
+#line 157
+
+#line 191 "/home/mc462/basilisk/src/grid/multigrid.h"
+#define foreach_level(l)\
+OMP_PARALLEL() {\
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);\
+  Point point = {0};\
+  point.level = l; point.n = 1 << point.level;\
+  int _k;\
+  OMP(omp for schedule(static))\
+  for (_k = 2; _k < point.n + 2; _k++) {\
+    point.i = _k;\
 \
-  parent.j = (point.j + 2)/2;\
+    for (point.j = 2; point.j < point.n + 2; point.j++)\
 \
+\
+\
+ {\
+\
+          POINT_VARIABLES\
 
-#line 341
+#line 208
+
+#define end_foreach_level()\
+\
+ }\
+\
+  }\
+}\
+
+#line 215
 
 
+#define foreach()\
+  OMP_PARALLEL() {\
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);\
+  Point point = {0};\
+  point.level = depth(); point.n = 1 << point.level;\
+  int _k;\
+  OMP(omp for schedule(static))\
+  for (_k = 2; _k < point.n + 2; _k++) {\
+    point.i = _k;\
+\
+    for (point.j = 2; point.j < point.n + 2; point.j++)\
+\
+\
+\
+ {\
+\
+          POINT_VARIABLES\
+
+#line 234
+
+#define end_foreach()\
+\
+ }\
+\
+  }\
+}\
+
+#line 241
+
+
+#define is_active(cell) (true)
+#define is_leaf(cell) (level == depth())
+#define is_local(cell) (true)
+#define leaf 2
+#define refine_cell(...) do {\
+  fprintf (stderr, "grid depths do not match. Aborting.\n");\
+  if (!(0)) qassert ("/home/mc462/basilisk/src/grid/multigrid.h", 249, "0");\
+} while (0)\
+
+#line 251
+
+#define tree ((Multigrid *)grid)
 #line 1 "grid/foreach_cell.h"
 #line 1 "/home/mc462/basilisk/src/grid/foreach_cell.h"
 #line 66 "/home/mc462/basilisk/src/grid/foreach_cell.h"
@@ -2723,159 +2286,85 @@ void cache_shrink (Cache * c)
 #line 281
 
 #define end_foreach_leaf() } continue; } end_foreach_cell()
-#line 344 "/home/mc462/basilisk/src/grid/tree.h"
-#line 361 "/home/mc462/basilisk/src/grid/tree.h"
+#line 254 "/home/mc462/basilisk/src/grid/multigrid.h"
+
+#define foreach_face_generic()\
+  OMP_PARALLEL() {\
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);\
+  Point point = {0};\
+  point.level = depth(); point.n = 1 << point.level;\
+  int _k;\
+  OMP(omp for schedule(static))\
+  for (_k = 2; _k <= point.n + 2; _k++) {\
+    point.i = _k;\
+\
+    for (point.j = 2; point.j <= point.n + 2; point.j++)\
+\
+\
+\
+        {\
+\
+   POINT_VARIABLES\
+
+#line 272
+
+#define end_foreach_face_generic()\
+\
+ }\
+\
+  }\
+}\
+
+#line 279
+
+
+#define foreach_vertex()\
+foreach_face_generic() {\
+  x -= Delta/2.;\
+\
+  y -= Delta/2.;\
+\
+\
+\
+\
+
+#line 290
+
+#define end_foreach_vertex() } end_foreach_face_generic()
+
+#define is_coarse() (point.level < depth())
+#line 321 "/home/mc462/basilisk/src/grid/multigrid.h"
+#define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n + 2) {
+#define end_is_face_x() }}
+#define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n + 2) {
+#define end_is_face_y() }}
+
 #define foreach_child() {\
   int _i = 2*point.i - 2, _j = 2*point.j - 2;\
   point.level++;\
-  for (int _k = 0; _k < 2; _k++) {\
-    point.i = _i + _k;\
+  point.n *= 2;\
+  for (int _k = 0; _k < 2; _k++)\
     for (int _l = 0; _l < 2; _l++) {\
-      point.j = _j + _l;\
+      point.i = _i + _k; point.j = _j + _l;\
       POINT_VARIABLES;\
 
-#line 369
+#line 334
 
 #define end_foreach_child()\
-    }\
   }\
   point.i = (_i + 2)/2; point.j = (_j + 2)/2;\
   point.level--;\
+  point.n /= 2;\
 }\
 
-#line 376
+#line 341
 
 #define foreach_child_break() _k = _l = 2
-#line 407 "/home/mc462/basilisk/src/grid/tree.h"
-#define is_refined_check() ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0) &&\
-    point.i > 0 && point.i < (1 << level) + 2*2 - 1\
-\
-    && point.j > 0 && point.j < (1 << level) + 2*2 - 1\
-\
-\
-\
-\
-    )\
-
-#line 416
-
-
-#define foreach_cache(_cache) {\
-  OMP_PARALLEL() {\
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);\
-  Point point = {0};\
-  point.i = 2;\
-\
-  point.j = 2;\
-\
-\
-\
-\
-  int _k; unsigned short _flags; NOT_UNUSED(_flags);\
-  OMP(omp for schedule(static))\
-  for (_k = 0; _k < _cache.n; _k++) {\
-    point.i = _cache.p[_k].i;\
-\
-    point.j = _cache.p[_k].j;\
-\
-\
-\
-\
-    point.level = _cache.p[_k].level;\
-    _flags = _cache.p[_k].flags;\
-    POINT_VARIABLES;\
-
-#line 442
-
-#define end_foreach_cache() } } }
-
-#define foreach_cache_level(_cache,_l) {\
-  OMP_PARALLEL() {\
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);\
-  Point point = {0};\
-  point.i = 2;\
-\
-  point.j = 2;\
-\
-\
-\
-\
-  point.level = _l;\
-  int _k;\
-  OMP(omp for schedule(static))\
-  for (_k = 0; _k < _cache.n; _k++) {\
-    point.i = _cache.p[_k].i;\
-\
-    point.j = _cache.p[_k].j;\
-\
-\
-\
-\
-    POINT_VARIABLES;\
-
-#line 468
-
-#define end_foreach_cache_level() } } }
-
-#define foreach_boundary_level(_l) {\
-  if (_l <= depth()) {\
-    { if (((Tree *)grid)->dirty) update_cache_f(); };\
-    CacheLevel _boundary = ((Tree *)grid)->boundary[_l];\
-    foreach_cache_level (_boundary,_l)\
-
-#line 476
-
-#define end_foreach_boundary_level() end_foreach_cache_level(); }}
-
-
-
-#define foreach_boundary(_b) {\
-  for (int _l = depth(); _l >= 0; _l--)\
-    foreach_boundary_level(_l) {\
-      if ((- cell.pid - 1) == _b)\
- for (int _d = 0; _d < 2; _d++) {\
-   for (int _i = -1; _i <= 1; _i += 2) {\
-     if (_d == 0) ig = _i; else if (_d == 1) jg = _i; else kg = _i;\
-     if (allocated(-ig,-jg,-kg) &&\
-  is_leaf (neighbor(-ig,-jg,-kg)) &&\
-  !(neighbor(-ig,-jg,-kg).pid < 0) &&\
-  is_local(neighbor(-ig,-jg,-kg))) {\
-       point.i -= ig; x -= ig*Delta/2.;\
-\
-       point.j -= jg; y -= jg*Delta/2.;\
-\
-\
-\
-\
-
-#line 499
-
-#define end_foreach_boundary()\
-       point.i += ig; x += ig*Delta/2.;\
-\
-       point.j += jg; y += jg*Delta/2.;\
-\
-\
-\
-\
-            }\
-   }\
-   ig = jg = kg = 0;\
- }\
-    } end_foreach_boundary_level(); }\
-
-#line 513
-
-
-#define foreach_halo(_name,_l) {\
-  if (_l <= depth()) {\
-    { if (((Tree *)grid)->dirty) update_cache_f(); };\
-    CacheLevel _cache = ((Tree *)grid)->_name[_l];\
-    foreach_cache_level (_cache, _l)\
-
-#line 520
-
-#define end_foreach_halo() end_foreach_cache_level(); }}
+#line 387 "/home/mc462/basilisk/src/grid/multigrid.h"
+#if TRASH
+# undef trash
+# define trash(list) reset(list, undefined)
+#endif
 
 #line 1 "grid/neighbors.h"
 #line 1 "/home/mc462/basilisk/src/grid/neighbors.h"
@@ -2900,1002 +2389,235 @@ void cache_shrink (Cache * c)
 #line 31
 
 #define foreach_neighbor_break() _k = _l = _nn + 1
-#line 524 "/home/mc462/basilisk/src/grid/tree.h"
-
-static inline bool has_local_children (Point point)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  {foreach_child()
-    if (is_local(cell))
-      return true;end_foreach_child()}
-  return false;
-}
-
-static inline void cache_append_face (Point point, unsigned short flags)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  Tree * q = ((Tree *)grid);
-  cache_append (&q->faces, point, flags);
-
-  if (!is_vertex(cell)) {
-    cache_append (&q->vertices, point, 0);
-    cell.flags |= vertex;
-  }
-  
-    if ((flags & face_y) && !is_vertex(neighbor(1,0,0))) {
-      cache_append (&q->vertices, neighborp(1,0,0), 0);
-      neighbor(1,0,0).flags |= vertex;
-    }
-    
-#line 543
-if ((flags & face_x) && !is_vertex(neighbor(0,1,0))) {
-      cache_append (&q->vertices, neighborp(0,1,0), 0);
-      neighbor(0,1,0).flags |= vertex;
-    }
-#line 557 "/home/mc462/basilisk/src/grid/tree.h"
-}
-
-
-
-static void update_cache_f (void)
-{
-  Tree * q = ((Tree *)grid);
-
-  {foreach_cache (q->vertices)
-    if (level <= depth() && allocated(0,0,0))
-      cell.flags &= ~vertex;end_foreach_cache();}
-
-
-  q->leaves.n = q->faces.n = q->vertices.n = 0;
-  for (int l = 0; l <= depth(); l++)
-    q->active[l].n = q->prolongation[l].n =
-      q->boundary[l].n = q->restriction[l].n = 0;
-
-  const unsigned short fboundary = 1 << user;
-  {foreach_cell() {
-
-
-
-    if (is_local(cell) && is_active(cell)) {
-
-
-      cache_level_append (&q->active[level], point);
-    }
-#line 601 "/home/mc462/basilisk/src/grid/tree.h"
-    if (!(cell.pid < 0)) {
-
-      {foreach_neighbor (2)
- if (allocated(0,0,0) && (cell.pid < 0) && !(cell.flags & fboundary)) {
-   cache_level_append (&q->boundary[level], point);
-   cell.flags |= fboundary;
- }end_foreach_neighbor()}
-    }
-
-    else if (level > 0 && is_local(aparent(0,0,0)))
-      cache_level_append (&q->restriction[level], point);
-
-    if (is_leaf (cell)) {
-      if (is_local(cell)) {
- cache_append (&q->leaves, point, 0);
-
- unsigned short flags = 0;
- 
-   if ((neighbor(-1,0,0).pid < 0) || (!is_leaf(neighbor(-1,0,0)) && !neighbor(-1,0,0).neighbors && neighbor(-1,0,0).pid >= 0) ||
-       is_leaf(neighbor(-1,0,0)))
-     flags |= face_x;
-   
-#line 619
-if ((neighbor(0,-1,0).pid < 0) || (!is_leaf(neighbor(0,-1,0)) && !neighbor(0,-1,0).neighbors && neighbor(0,-1,0).pid >= 0) ||
-       is_leaf(neighbor(0,-1,0)))
-     flags |= face_y;
- if (flags)
-   cache_append (&q->faces, point, flags);
- 
-   if ((neighbor(1,0,0).pid < 0) || (!is_leaf(neighbor(1,0,0)) && !neighbor(1,0,0).neighbors && neighbor(1,0,0).pid >= 0) ||
-       (!is_local(neighbor(1,0,0)) && is_leaf(neighbor(1,0,0))))
-     cache_append (&q->faces, neighborp(1,0,0), face_x);
-   
-#line 625
-if ((neighbor(0,1,0).pid < 0) || (!is_leaf(neighbor(0,1,0)) && !neighbor(0,1,0).neighbors && neighbor(0,1,0).pid >= 0) ||
-       (!is_local(neighbor(0,1,0)) && is_leaf(neighbor(0,1,0))))
-     cache_append (&q->faces, neighborp(0,1,0), face_y);
-
- for (int i = 0; i <= 1; i++)
-
-   for (int j = 0; j <= 1; j++)
-
-
-
-
-       if (!is_vertex(neighbor(i,j,k))) {
-  cache_append (&q->vertices, neighborp(i,j,k), 0);
-  neighbor(i,j,k).flags |= vertex;
-       }
-
-        if (cell.neighbors > 0)
-   cache_level_append (&q->prolongation[level], point);
-      }
-      else if (!(cell.pid < 0) || is_local(aparent(0,0,0))) {
-
- unsigned short flags = 0;
- 
-   if (allocated(-1,0,0) &&
-       is_local(neighbor(-1,0,0)) && (!is_leaf(neighbor(-1,0,0)) && !neighbor(-1,0,0).neighbors && neighbor(-1,0,0).pid >= 0))
-     flags |= face_x;
-   
-#line 648
-if (allocated(0,-1,0) &&
-       is_local(neighbor(0,-1,0)) && (!is_leaf(neighbor(0,-1,0)) && !neighbor(0,-1,0).neighbors && neighbor(0,-1,0).pid >= 0))
-     flags |= face_y;
- if (flags)
-   cache_append_face (point, flags);
- 
-   if (allocated(1,0,0) && is_local(neighbor(1,0,0)) &&
-       (!is_leaf(neighbor(1,0,0)) && !neighbor(1,0,0).neighbors && neighbor(1,0,0).pid >= 0))
-     cache_append_face (neighborp(1,0,0), face_x);
-   
-#line 654
-if (allocated(0,1,0) && is_local(neighbor(0,1,0)) &&
-       (!is_leaf(neighbor(0,1,0)) && !neighbor(0,1,0).neighbors && neighbor(0,1,0).pid >= 0))
-     cache_append_face (neighborp(0,1,0), face_y);
-      }
-
-      continue;
-
-    }
-  }end_foreach_cell();}
-
-
-  cache_shrink (&q->leaves);
-  cache_shrink (&q->faces);
-  cache_shrink (&q->vertices);
-  for (int l = 0; l <= depth(); l++) {
-    cache_level_shrink (&q->active[l]);
-    cache_level_shrink (&q->prolongation[l]);
-    cache_level_shrink (&q->boundary[l]);
-    cache_level_shrink (&q->restriction[l]);
-}
-
-  q->dirty = false;
-
-
-  for (int l = depth(); l >= 0; l--)
-    {foreach_boundary_level (l)
-      cell.flags &= ~fboundary;end_foreach_boundary_level();}
-
-
-
-  grid->n = q->leaves.n;
-
-#if !1
-  grid->tn = grid->n;
-  grid->maxdepth = grid->depth;
-#endif
-}
-
-#define foreach() { if (((Tree *)grid)->dirty) update_cache_f(); }; foreach_cache(((Tree *)grid)->leaves)
-#define end_foreach() end_foreach_cache()
-
-#define foreach_face_generic()\
-  { if (((Tree *)grid)->dirty) update_cache_f(); };\
-  foreach_cache(((Tree *)grid)->faces) 
-#line 716
-
-#define end_foreach_face_generic() end_foreach_cache()
-
-#define is_face_x() { int ig = -1; VARIABLES; if (_flags & face_x) {
-#define end_is_face_x() }}
-
-
-#define is_face_y() { int jg = -1; VARIABLES; if (_flags & face_y) {
-#define end_is_face_y() }}
-
-
-
-
-
-
-#define foreach_vertex()\
-  { if (((Tree *)grid)->dirty) update_cache_f(); };\
-  foreach_cache(((Tree *)grid)->vertices) {\
-    x -= Delta/2.;\
-\
-    y -= Delta/2.;\
-\
-\
-\
-\
-
-#line 742
-
-#define end_foreach_vertex() } end_foreach_cache()
-#line 734 "/home/mc462/basilisk/src/grid/tree.h"
-#define foreach_level(l) {\
-  if (l <= depth()) {\
-    { if (((Tree *)grid)->dirty) update_cache_f(); };\
-    CacheLevel _active = ((Tree *)grid)->active[l];\
-    foreach_cache_level (_active,l)\
-
-#line 739
-
-#define end_foreach_level() end_foreach_cache_level(); }}
-
-#define foreach_coarse_level(l) foreach_level(l) if (!is_leaf(cell)) {
-#define end_foreach_coarse_level() } end_foreach_level()
-
-#define foreach_level_or_leaf(l) {\
-  for (int _l1 = l; _l1 >= 0; _l1--)\
-    foreach_level(_l1)\
-      if (_l1 == l || is_leaf (cell)) {\
-
-#line 749
-
-#define end_foreach_level_or_leaf() } end_foreach_level(); }
-
-#if TRASH
-# undef trash
-# define trash(list) reset(list, undefined)
-#endif
+#line 393 "/home/mc462/basilisk/src/grid/multigrid.h"
 
 void reset (void * alist, double val)
 {
   scalar * list = (scalar *) alist;
-  Tree * q = ((Tree *)grid);
-
-  for (int l = 0; l <= depth(); l++) {
-    Layer * L = q->L[l];
-    {foreach_mem (L->m, L->len, 1) {
-      point.level = l;
+  Point p;
+  p.level = depth(); p.n = 1 << p.level;
+  for (; p.level >= 0; p.n /= 2, p.level--)
+    for (int i = 0; i < sq(p.n + 2*2); i++)
       {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
  if (!is_constant(s))
    for (int b = 0; b < _attribute[s.i].block; b++)
-     data(0,0,0)[s.i + b] = val;
+     ((double *)(&((Multigrid *)grid)->d[p.level][i*datasize]))[s.i + b] = val;
       }}}
-    }end_foreach_mem();}
-  }
 }
+#line 433 "/home/mc462/basilisk/src/grid/multigrid.h"
+#define foreach_boundary_dir(l,d)\
+  OMP_PARALLEL() {\
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);\
+  Point point = {0};\
+  point.level = l < 0 ? depth() : l;\
+  point.n = 1 << point.level;\
+  int * _i = &point.j;\
+  if (d == left) {\
+    point.i = 2;\
+    ig = -1;\
+  }\
+  else if (d == right) {\
+    point.i = point.n + 2 - 1;\
+    ig = 1;\
+  }\
+  else if (d == bottom) {\
+    point.j = 2;\
+    _i = &point.i;\
+    jg = -1;\
+  }\
+  else if (d == top) {\
+    point.j = point.n + 2 - 1;\
+    _i = &point.i;\
+    jg = 1;\
+  }\
+  int _l;\
+  OMP(omp for schedule(static))\
+  for (_l = 0; _l < point.n + 2*2; _l++) {\
+    *_i = _l;\
+    {\
+      POINT_VARIABLES\
 
-static CacheLevel * cache_level_resize (CacheLevel * name, int a)
+#line 464
+
+#define end_foreach_boundary_dir()\
+    }\
+  }\
+}\
+
+#line 469
+
+
+#define neighbor(o,p,q)\
+  ((Point){point.i+o, point.j+p, point.level, point.n _BLOCK_INDEX})\
+
+#line 473
+
+#define is_boundary(point) (point.i < 2 || point.i >= point.n + 2 ||\
+    point.j < 2 || point.j >= point.n + 2)\
+
+#line 476
+
+#line 538 "/home/mc462/basilisk/src/grid/multigrid.h"
+#define foreach_boundary(b)\
+  if (default_scalar_bc[b] != periodic_bc)\
+    foreach_boundary_dir (depth(), b)\
+      if (!is_boundary(point)) {\
+
+#line 542
+
+#define end_foreach_boundary() } end_foreach_boundary_dir()
+
+#define neighborp(k,l,o) neighbor(k,l,o)
+
+static double periodic_bc (Point point, Point neighbor, scalar s, void * data);
+
+static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 {
-  for (int i = 0; i <= depth() - a; i++)
-    pfree (name[i].p,__func__,__FILE__,__LINE__);
-  pfree (name,__func__,__FILE__,__LINE__);
-  return ((CacheLevel *) pcalloc (depth() + 1, sizeof(CacheLevel),__func__,__FILE__,__LINE__));
-}
-
-static void update_depth (int inc)
-{
-  Tree * q = ((Tree *)grid);
-  grid->depth += inc;
-  q->L = &(q->L[-1]);
-  q->L = (Layer * *) prealloc (q->L, (grid->depth + 2)*sizeof(Layer *),__func__,__FILE__,__LINE__);
-  q->L = &(q->L[1]);
-  if (inc > 0)
-    q->L[grid->depth] = new_layer (grid->depth);
-  q->active = cache_level_resize (q->active, inc);
-  q->prolongation = cache_level_resize (q->prolongation, inc);
-  q->boundary = cache_level_resize (q->boundary, inc);
-  q->restriction = cache_level_resize (q->restriction, inc);
-}
-#line 823 "/home/mc462/basilisk/src/grid/tree.h"
-typedef void (* PeriodicFunction) (struct _Memindex *, int, int, int, void *);
-
-static void periodic_function (struct _Memindex * m, int i, int j, int len, void * b,
-          PeriodicFunction f)
-{
-  f(m, i, j, len, b);
-  if (Period.x) {
-    int nl = len - 2*2;
-    for (int l = - 1; l <= 1; l += 2)
-      for (int n = i + l*nl; n >= 0 && n < len; n += l*nl)
- f(m, n, j, len, b);
-    if (Period.y)
-      for (int l = - 1; l <= 1; l += 2)
- for (int n = j + l*nl; n >= 0 && n < len; n += l*nl) {
-   f(m, i, n, len, b);
-   for (int o = - 1; o <= 1; o += 2)
-     for (int p = i + o*nl; p >= 0 && p < len; p += o*nl)
-       f(m, p, n, len, b);
- }
-  }
-  else if (Period.y) {
-    int nl = len - 2*2;
-    for (int l = - 1; l <= 1; l += 2)
-      for (int n = j + l*nl; n >= 0 && n < len; n += l*nl)
- f(m, i, n, len, b);
-  }
-}
-
-static void assign_periodic (struct _Memindex * m, int i, int j, int len, void * b)
-{
-  periodic_function (m, i, j, len, b, mem_assign);
-}
-
-static void free_periodic (struct _Memindex * m, int i, int j, int len)
-{
-  periodic_function (m, i, j, len, NULL, (PeriodicFunction) mem_free);
-}
-#line 938 "/home/mc462/basilisk/src/grid/tree.h"
-static void alloc_children (Point point)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  if (point.level == grid->depth)
-    update_depth (+1);
-  else if (allocated_child(0,0,0))
-    return;
-
-
-  Layer * L = ((Tree *)grid)->L[point.level + 1];
-  L->nc++;
-  size_t len = sizeof(Cell) + datasize;
-  char * b = (char *) mempool_alloc0 (L->pool);
-  int i = 2*point.i - 2;
-  for (int k = 0; k < 2; k++, i++) {
-
-
-
-
-    int j = 2*point.j - 2;
-    for (int l = 0; l < 2; l++, j++) {
-      assign_periodic (L->m, i, j, L->len, b);
-      b += len;
-    }
-#line 971 "/home/mc462/basilisk/src/grid/tree.h"
-  }
-
-  int pid = cell.pid;
-  {foreach_child() {
-    cell.pid = pid;
-#if TRASH
-    {scalar*_i=(scalar*)( all);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-      val(s,0,0,0) = undefined;}}
-#endif
-  }end_foreach_child()}
-}
-#line 1000 "/home/mc462/basilisk/src/grid/tree.h"
-static void free_children (Point point)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-  Layer * L = ((Tree *)grid)->L[point.level + 1];
-  int i = 2*point.i - 2, j = 2*point.j - 2;
-  if (!(((L->m)->b[i][j]))) qassert ("/home/mc462/basilisk/src/grid/tree.h", 1005, "mem_data (L->m,i,j)");
-  mempool_free (L->pool, ((L->m)->b[i][j]));
-  for (int k = 0; k < 2; k++)
-    for (int l = 0; l < 2; l++)
-      free_periodic (L->m, i + k, j + l, L->len);
-  if (--L->nc == 0) {
-    destroy_layer (L);
-    if (!(point.level + 1 == grid->depth)) qassert ("/home/mc462/basilisk/src/grid/tree.h", 1012, "point.level + 1 == grid->depth");
-    update_depth (-1);
-  }
-}
-#line 1041 "/home/mc462/basilisk/src/grid/tree.h"
-void increment_neighbors (Point point)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  ((Tree *)grid)->dirty = true;
-  if (cell.neighbors++ == 0)
-    alloc_children (point);
-  {foreach_neighbor (2/2)
-    if (cell.neighbors++ == 0)
-      alloc_children (point);end_foreach_neighbor()}
-  cell.neighbors--;
-}
-
-void decrement_neighbors (Point point)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  ((Tree *)grid)->dirty = true;
-  {foreach_neighbor (2/2)
-    if (allocated(0,0,0)) {
-      cell.neighbors--;
-      if (cell.neighbors == 0)
- free_children (point);
-    }end_foreach_neighbor()}
-  if (cell.neighbors) {
-    int pid = cell.pid;
-    {foreach_child() {
-      cell.flags = 0;
-      cell.pid = pid;
-    }end_foreach_child()}
-  }
-}
-
-void realloc_scalar (int size)
-{
-
-  Tree * q = ((Tree *)grid);
-  size_t oldlen = sizeof(Cell) + datasize;
-  size_t newlen = oldlen + size;
-  datasize += size;
-
-  Layer * L = q->L[0];
-  {foreach_mem (L->m, L->len, 1) {
-
-
-
-
-    char * p = (char *) prealloc (((L->m)->b[point.i][point.j]),
-     newlen*sizeof(char),__func__,__FILE__,__LINE__);
-    assign_periodic (L->m, point.i, point.j, L->len, p);
-
-
-
-
-
-  }end_foreach_mem();}
-
-  for (int l = 1; l <= depth(); l++) {
-    Layer * L = q->L[l];
-    Mempool * oldpool = L->pool;
-    L->pool = mempool_new (poolsize (l, newlen), (1 << 2)*newlen);
-    {foreach_mem (L->m, L->len, 2) {
-      char * new = (char *) mempool_alloc (L->pool);
-
-
-
-
-
-
-
-      for (int k = 0; k < 2; k++)
- for (int o = 0; o < 2; o++) {
-   memcpy (new, ((L->m)->b[point.i + k][point.j + o]), oldlen);
-   assign_periodic (L->m, point.i + k, point.j + o, L->len, new);
-   new += newlen;
- }
-#line 1124 "/home/mc462/basilisk/src/grid/tree.h"
-    }end_foreach_mem();}
-    mempool_destroy (oldpool);
-  }
-}
-
-
-
-#define VN v.x
-#define VT v.y
-#define VR v.z
-
-
-
-
-#if 1
-# define disable_fpe_for_mpi() disable_fpe (FE_DIVBYZERO|FE_INVALID)
-# define enable_fpe_for_mpi() enable_fpe (FE_DIVBYZERO|FE_INVALID)
-#else
-# define disable_fpe_for_mpi()
-# define enable_fpe_for_mpi()
-#endif
-
-static inline void no_restriction (Point point, scalar s);
-
-static bool normal_neighbor (Point point, scalar * scalars, vector * vectors)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  for (int k = 1; k <= 2; k++)
-    {
-      for (int i = -k; i <= k; i += 2*k)
- if ((allocated(i,0,0) && !(neighbor(i,0,0).pid < 0))) {
-   Point neighbor = neighborp(i,0,0);
-   int id = (- cell.pid - 1);
-   {scalar*_i=(scalar*)( scalars);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    
-       val(s,0,0,0) = _attribute[s.i].boundary[id](neighbor, point, s, NULL);}}
-   {vector*_i=(vector*)( vectors);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
-     {
-       scalar vn = VN;
-       val(v.x,0,0,0) = _attribute[vn.i].boundary[id](neighbor, point, v.x, NULL);
-
-       scalar vt = VT;
-       val(v.y,0,0,0) = _attribute[vt.i].boundary[id](neighbor, point, v.y, NULL);
-
-
-
-
-
-     }}}
-   return true;
- }
-      
-#line 1152
-for (int i = -k; i <= k; i += 2*k)
- if ((allocated(0,i,0) && !(neighbor(0,i,0).pid < 0))) {
-   Point neighbor = neighborp(0,i,0);
-   int id = (- cell.pid - 1);
-   {scalar*_i=(scalar*)( scalars);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    
-       val(s,0,0,0) = _attribute[s.i].boundary[id](neighbor, point, s, NULL);}}
-   {vector*_i=(vector*)( vectors);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
-     {
-       scalar vn = VN;
-       val(v.y,0,0,0) = _attribute[vn.i].boundary[id](neighbor, point, v.y, NULL);
-
-       scalar vt = VT;
-       val(v.x,0,0,0) = _attribute[vt.i].boundary[id](neighbor, point, v.x, NULL);
-
-
-
-
-
-     }}}
-   return true;
- }}
-  return false;
-}
-
-static bool diagonal_neighbor_2D (Point point,
-      scalar * scalars, vector * vectors)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-  for (int k = 1; k <= 2; k++)
-
-
-
-      for (int i = -k; i <= k; i += 2*k)
- for (int j = -k; j <= k; j += 2*k)
-   if (allocated(i,j,0) && (allocated(i,j,0) && !(neighbor(i,j,0).pid < 0)) &&
-       allocated(i,0,0) && (neighbor(i,0,0).pid < 0) &&
-       allocated(0,j,0) && (neighbor(0,j,0).pid < 0)) {
-     Point n = neighborp(i,j,0),
-       n1 = neighborp(i,0,0), n2 = neighborp(0,j,0);
-     int id1 = (- neighbor(i,0,0).pid - 1), id2 = (- neighbor(0,j,0).pid - 1);
-     {scalar*_i=(scalar*)( scalars);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-      
-  val(s,0,0,0) = (_attribute[s.i].boundary[id1](n,n1,s,NULL) +
-         _attribute[s.i].boundary[id2](n,n2,s,NULL) -
-         val(s,i,j,0));}}
-     {vector*_i=(vector*)( vectors);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
-       {
-  scalar vt = VT, vn = VN;
-  val(v.x,0,0,0) = (_attribute[vt.i].boundary[id1](n,n1,v.x,NULL) +
-    _attribute[vn.i].boundary[id2](n,n2,v.x,NULL) -
-    val(v.x,i,j,0));
-  val(v.y,0,0,0) = (_attribute[vn.i].boundary[id1](n,n1,v.y,NULL) +
-    _attribute[vt.i].boundary[id2](n,n2,v.y,NULL) -
-    val(v.y,i,j,0));
-
-
-
-
-
-
-       }}}
-     return true;
-   }
-
-  return false;
-}
-
-static bool diagonal_neighbor_3D (Point point,
-      scalar * scalars, vector * vectors)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-#line 1266 "/home/mc462/basilisk/src/grid/tree.h"
-  return false;
-}
-
-
-
-static Point tangential_neighbor_x (Point point, bool * zn)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  for (int k = 1; k <= 2; k++)
-    for (int j = -k; j <= k; j += 2*k) {
-      if ((allocated(0,j,0) && !(neighbor(0,j,0).pid < 0)) || (allocated(-1,j,0) && !(neighbor(-1,j,0).pid < 0))) {
- *zn = false;
- return neighborp(0,j,0);
-      }
-
-
-
-
-
-
-
-    }
-  return (Point){.level = -1};
-}
-
-#line 1271
-static Point tangential_neighbor_y (Point point, bool * zn)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  for (int k = 1; k <= 2; k++)
-    for (int j = -k; j <= k; j += 2*k) {
-      if ((allocated(j,0,0) && !(neighbor(j,0,0).pid < 0)) || (allocated(j,-1,0) && !(neighbor(j,-1,0).pid < 0))) {
- *zn = false;
- return neighborp(j,0,0);
-      }
-
-
-
-
-
-
-
-    }
-  return (Point){.level = -1};
-}
-
-
-static inline bool is_boundary_point (Point point) {int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  return (cell.pid < 0);
-}
-
-static void box_boundary_level (const Boundary * b, scalar * list, int l)
-{
-  disable_fpe_for_mpi();
-  scalar * scalars = NULL;
-  vector * vectors = NULL, * faces = NULL;
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    if (!is_constant(s) && _attribute[s.i].refine != no_restriction) {
-      if (_attribute[s.i].v.x.i == s.i) {
- if (_attribute[s.i].face)
-   faces = vectors_add (faces, _attribute[s.i].v);
- else
-   vectors = vectors_add (vectors, _attribute[s.i].v);
-      }
-      else if (_attribute[s.i].v.x.i < 0 && _attribute[s.i].boundary[0])
- scalars = list_add (scalars, s);
-    }}}
-
-  {foreach_boundary_level (l) {
-    if (!normal_neighbor (point, scalars, vectors) &&
- !diagonal_neighbor_2D (point, scalars, vectors) &&
- !diagonal_neighbor_3D (point, scalars, vectors)) {
-
+  extern double (* default_scalar_bc[]) (Point, Point, scalar, void *);
+  disable_fpe (FE_DIVBYZERO|FE_INVALID);
+  for (int d = 0; d < 2*2; d++)
+    if (default_scalar_bc[d] == periodic_bc)
       {scalar*_i=(scalar*)( scalars);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
+ if (!is_constant(s) && _attribute[s.i].block > 0) {
+   if (is_vertex_scalar (s))
+     _attribute[s.i].boundary[d] = _attribute[s.i].boundary_homogeneous[d] = NULL;
+   else if (_attribute[s.i].face) {
+     vector v = _attribute[s.i].v;
+     _attribute[v.x.i].boundary[d] = _attribute[v.x.i].boundary_homogeneous[d] = NULL;
+   }
+ }}}
+  for (int bghost = 1; bghost <= 2; bghost++)
+    for (int d = 0; d < 2*2; d++) {
 
-   val(s,0,0,0) = undefined;}}
-      {vector*_i=(vector*)( vectors);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
+      scalar * list = NULL, * listb = NULL;
+      {scalar*_i=(scalar*)( scalars);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
+ if (!is_constant(s) && _attribute[s.i].block > 0) {
+   scalar sb = s;
 
-   {
-     val(v.x,0,0,0) = undefined;
-     
-#line 1323
-val(v.y,0,0,0) = undefined;}}}
-    }
-    if (faces) {
-      int id = (- cell.pid - 1);
+   if (_attribute[s.i].v.x.i >= 0) {
+
+     int j = 0;
+     while ((&_attribute[s.i].v.x)[j].i != s.i) j++;
+     sb = (&_attribute[s.i].v.x)[(j - d/2 + 2) % 2];
+   }
+
+   if (_attribute[sb.i].boundary[d] && _attribute[sb.i].boundary[d] != periodic_bc) {
+     list = list_append (list, s);
+     listb = list_append (listb, sb);
+   }
+ }}}
+
+      if (list) {
+ {foreach_boundary_dir (l, d) {
+   scalar s, sb;
+   {scalar*_i0=listb;scalar*_i1= list;if(_i0)for(sb=*_i0,s=*_i1;_i0->i>= 0;sb=*++_i0,s=*++_i1){ {
+     if ((_attribute[s.i].face && sb.i == _attribute[s.i].v.x.i) || is_vertex_scalar (s)) {
+
+       if (bghost == 1)
+ 
+    val(s,(ig + 1)/2,(jg + 1)/2,(kg + 1)/2) =
+    _attribute[sb.i].boundary[d] (point, neighborp(ig,jg,kg), s, NULL);
+     }
+     else
+
       
- for (int i = -1; i <= 1; i += 2) {
-
-   if ((allocated(i,0,0) && !(neighbor(i,0,0).pid < 0))) {
-     Point neighbor = neighborp(i,0,0);
-     {vector*_i=(vector*)( faces);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){ {
-       scalar vn = VN;
-       if (_attribute[vn.i].boundary[id])
- 
-    val(v.x,(i + 1)/2,0,0) = _attribute[vn.i].boundary[id](neighbor, point, v.x, NULL);
-     }}}
-   }
-
-   else if (i == -1) {
-
-     bool zn;
-     Point neighbor = tangential_neighbor_x (point, &zn);
-     if (neighbor.level >= 0) {
-       int id = is_boundary_point (neighbor) ?
-  (- neighbor(-1,0,0).pid - 1) : (- cell.pid - 1);
-       {vector*_i=(vector*)( faces);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){ {
-
-  scalar vt = VT;
-
-
-
- 
-    val(v.x,0,0,0) = _attribute[vt.i].boundary[id](neighbor, point, v.x, NULL);
-       }}}
-     }
-     else
-
-       {vector*_i=(vector*)( faces);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
- 
-    val(v.x,0,0,0) = 0.;}}
-   }
-
- }
- 
-#line 1328
-for (int i = -1; i <= 1; i += 2) {
-
-   if ((allocated(0,i,0) && !(neighbor(0,i,0).pid < 0))) {
-     Point neighbor = neighborp(0,i,0);
-     {vector*_i=(vector*)( faces);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){ {
-       scalar vn = VN;
-       if (_attribute[vn.i].boundary[id])
- 
-    val(v.y,0,(i + 1)/2,0) = _attribute[vn.i].boundary[id](neighbor, point, v.y, NULL);
-     }}}
-   }
-
-   else if (i == -1) {
-
-     bool zn;
-     Point neighbor = tangential_neighbor_y (point, &zn);
-     if (neighbor.level >= 0) {
-       int id = is_boundary_point (neighbor) ?
-  (- neighbor(0,-1,0).pid - 1) : (- cell.pid - 1);
-       {vector*_i=(vector*)( faces);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){ {
-
-  scalar vt = VT;
-
-
-
- 
-    val(v.y,0,0,0) = _attribute[vt.i].boundary[id](neighbor, point, v.y, NULL);
-       }}}
-     }
-     else
-
-       {vector*_i=(vector*)( faces);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
- 
-    val(v.y,0,0,0) = 0.;}}
-   }
-
- }
+  val(s,bghost*ig,bghost*jg,bghost*kg) =
+  _attribute[sb.i].boundary[d] (neighborp((1 - bghost)*ig,
+       (1 - bghost)*jg,
+       (1 - bghost)*kg),
+    neighborp(bghost*ig,bghost*jg,bghost*kg),
+    s, NULL);
+   }}}
+ }end_foreach_boundary_dir();}
+ pfree (list,__func__,__FILE__,__LINE__);
+ pfree (listb,__func__,__FILE__,__LINE__);
+      }
     }
-  }end_foreach_boundary_level();}
-
-  pfree (scalars,__func__,__FILE__,__LINE__);
-  pfree (vectors,__func__,__FILE__,__LINE__);
-  pfree (faces,__func__,__FILE__,__LINE__);
-  enable_fpe_for_mpi();
+  enable_fpe (FE_DIVBYZERO|FE_INVALID);
 }
-
-
-
-#undef VN
-#undef VT
-#define VN _attribute[s.i].v.x
-#define VT _attribute[s.i].v.y
-
-static double masked_average (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  double sum = 0., n = 0.;
-  {foreach_child()
-    if (!(cell.pid < 0) && val(s,0,0,0) != 1e30)
-      sum += val(s,0,0,0), n++;end_foreach_child()}
-  return n ? sum/n : 1e30;
-}
-
-
-static double masked_average_x (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  double sum = 0., n = 0.;
-  {foreach_child()
-    if (child.x < 0 && (!(cell.pid < 0) || !(neighbor(1,0,0).pid < 0)) &&
- val(s,1,0,0) != 1e30)
-      sum += val(s,1,0,0), n++;end_foreach_child()}
-  return n ? sum/n : 1e30;
-}
-
-#line 1391
-static double masked_average_y (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  double sum = 0., n = 0.;
-  {foreach_child()
-    if (child.y < 0 && (!(cell.pid < 0) || !(neighbor(0,1,0).pid < 0)) &&
- val(s,0,1,0) != 1e30)
-      sum += val(s,0,1,0), n++;end_foreach_child()}
-  return n ? sum/n : 1e30;
-}
-
-static void masked_boundary_restriction (const Boundary * b,
-      scalar * list, int l)
-{
-  scalar * scalars = NULL;
-  vector * faces = NULL;
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    if (!is_constant(s) && _attribute[s.i].refine != no_restriction) {
-      if (_attribute[s.i].v.x.i == s.i && _attribute[s.i].face)
- faces = vectors_add (faces, _attribute[s.i].v);
-      else
- scalars = list_add (scalars, s);
-    }}}
-
-  {foreach_halo (restriction, l) {
-    {scalar*_i=(scalar*)( scalars);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-      val(s,0,0,0) = masked_average (parent, s);}}
-    {vector*_i=(vector*)( faces);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
-      { {
- double average = masked_average_x (parent, v.x);
- if ((neighbor(-1,0,0).pid < 0))
-   val(v.x,0,0,0) = average;
- if ((neighbor(1,0,0).pid < 0))
-   val(v.x,1,0,0) = average;
-      } 
-#line 1418
-{
- double average = masked_average_y (parent, v.y);
- if ((neighbor(0,-1,0).pid < 0))
-   val(v.y,0,0,0) = average;
- if ((neighbor(0,1,0).pid < 0))
-   val(v.y,0,1,0) = average;
-      }}}}
-  }end_foreach_halo();}
-
-  pfree (scalars,__func__,__FILE__,__LINE__);
-  pfree (faces,__func__,__FILE__,__LINE__);
-}
-#line 1454 "/home/mc462/basilisk/src/grid/tree.h"
-static void free_cache (CacheLevel * c)
-{
-  for (int l = 0; l <= depth(); l++)
-    pfree (c[l].p,__func__,__FILE__,__LINE__);
-  pfree (c,__func__,__FILE__,__LINE__);
-}
-
+#line 721 "/home/mc462/basilisk/src/grid/multigrid.h"
 void free_grid (void)
 {
   if (!grid)
     return;
   free_boundaries();
-  Tree * q = ((Tree *)grid);
-  pfree (q->leaves.p,__func__,__FILE__,__LINE__);
-  pfree (q->faces.p,__func__,__FILE__,__LINE__);
-  pfree (q->vertices.p,__func__,__FILE__,__LINE__);
-  pfree (q->refined.p,__func__,__FILE__,__LINE__);
-
-
-  Layer * L = q->L[0];
-  {foreach_mem (L->m, L->len, 1) {
-
-
-
-    pfree (((L->m)->b[point.i][point.j]),__func__,__FILE__,__LINE__);
-
-
-
-  }end_foreach_mem();}
+  Multigrid * m = ((Multigrid *)grid);
   for (int l = 0; l <= depth(); l++)
-    destroy_layer (q->L[l]);
-  q->L = &(q->L[-1]);
-  pfree (q->L,__func__,__FILE__,__LINE__);
-  free_cache (q->active);
-  free_cache (q->prolongation);
-  free_cache (q->boundary);
-  free_cache (q->restriction);
-  pfree (q,__func__,__FILE__,__LINE__);
+    pfree (m->d[l],__func__,__FILE__,__LINE__);
+  pfree (m->d,__func__,__FILE__,__LINE__);
+  pfree (m,__func__,__FILE__,__LINE__);
   grid = NULL;
 }
 
-static void refine_level (int depth);
+int log_base2 (int n) {
+  int m = n, r = 0;
+  while (m > 1)
+    m /= 2, r++;
+  return (1 << r) < n ? r + 1 : r;
+}
 
-     
 void init_grid (int n)
-{tracing("init_grid","/home/mc462/basilisk/src/grid/tree.h",1498);
-
-  if (!(sizeof(Cell) % 8 == 0)) qassert ("/home/mc462/basilisk/src/grid/tree.h", 1501, "sizeof(Cell) % 8 == 0");
-
+{
   free_grid();
-  int depth = 0;
-  while (n > 1) {
-    if (n % 2) {
-      fprintf (ferr, "tree: N must be a power-of-two\n");
-      exit (1);
-    }
-    n /= 2;
-    depth++;
-  }
-  Tree * q = ((Tree *) pcalloc (1, sizeof(Tree),__func__,__FILE__,__LINE__));
-  grid = (Grid *) q;
-  grid->depth = 0;
+  Multigrid * m = ((Multigrid *) pmalloc ((1)*sizeof(Multigrid),__func__,__FILE__,__LINE__));
+  grid = (Grid *) m;
+  grid->depth = grid->maxdepth = log_base2(n);
+  N = 1 << depth();
 
-
-  q->L = ((Layer * *) pmalloc ((2)*sizeof(Layer *),__func__,__FILE__,__LINE__));
-
-  q->L[0] = NULL; q->L = &(q->L[1]);
-
-  Layer * L = new_layer (0);
-  q->L[0] = L;
-#line 1537 "/home/mc462/basilisk/src/grid/tree.h"
-  for (int i = Period.x*2; i < L->len - Period.x*2; i++)
-    for (int j = Period.y*2; j < L->len - Period.y*2; j++)
-      assign_periodic (L->m, i, j, L->len,
-         (char *) pcalloc (1, sizeof(Cell) + datasize,__func__,__FILE__,__LINE__));
-  CELL(((L->m)->b[2][2])).flags |= leaf;
-  if (pid() == 0)
-    CELL(((L->m)->b[2][2])).flags |= active;
-  for (int k = - 2*(1 - Period.x); k <= 2*(1 - Period.x); k++)
-    for (int l = -2*(1 - Period.y); l <= 2*(1 - Period.y); l++)
-      CELL(((L->m)->b[2 +k][2 +l])).pid =
- (k < 0 ? -1 - left :
-  k > 0 ? -1 - right :
-  l > 0 ? -1 - top :
-  l < 0 ? -1 - bottom :
-  0);
-  CELL(((L->m)->b[2][2])).pid = 0;
-#line 1575 "/home/mc462/basilisk/src/grid/tree.h"
-  q->active = ((CacheLevel *) pcalloc (1, sizeof(CacheLevel),__func__,__FILE__,__LINE__));
-  q->prolongation = ((CacheLevel *) pcalloc (1, sizeof(CacheLevel),__func__,__FILE__,__LINE__));
-  q->boundary = ((CacheLevel *) pcalloc (1, sizeof(CacheLevel),__func__,__FILE__,__LINE__));
-  q->restriction = ((CacheLevel *) pcalloc (1, sizeof(CacheLevel),__func__,__FILE__,__LINE__));
-  q->dirty = true;
-  N = 1 << depth;
-#if 1
-  void mpi_boundary_new();
-  mpi_boundary_new();
-#endif
+  grid->n = grid->tn = 1 << 2*depth();
 
   Boundary * b = ((Boundary *) pcalloc (1, sizeof(Boundary),__func__,__FILE__,__LINE__));
   b->level = box_boundary_level;
-  b->restriction = masked_boundary_restriction;
   add_boundary (b);
-  refine_level (depth);
+
+  Boundary * mpi_boundary_new();
+  mpi_boundary_new();
+#line 766 "/home/mc462/basilisk/src/grid/multigrid.h"
+  m->d = (char **) pmalloc(sizeof(Point *)*(depth() + 1),__func__,__FILE__,__LINE__);
+  for (int l = 0; l <= depth(); l++) {
+    size_t len = _size(l)*datasize;
+    m->d[l] = (char *) pmalloc (len,__func__,__FILE__,__LINE__);
+
+
+    double * v = (double *) m->d[l];
+    for (int i = 0; i < len/sizeof(double); i++)
+      v[i] = undefined;
+  }
   reset (all, 0.);
-  { if (((Tree *)grid)->dirty) update_cache_f(); };
-end_tracing("init_grid","/home/mc462/basilisk/src/grid/tree.h",1593);}
+}
 
-
-void check_two_one (void)
+void realloc_scalar (int size)
 {
-  {foreach_leaf()
-    if (level > 0)
-      for (int k = -1; k <= 1; k++)
- for (int l = -1; l <= 1; l++) {
-
-   int i = (point.i + 2)/2 + k;
-   int j = (point.j + 2)/2 + l;
-   double x = ((i - 2 + 0.5)*(1./(1 << point.level))*2. - 0.5);
-   double y = ((j - 2 + 0.5)*(1./(1 << point.level))*2. - 0.5);
-   if (x > -0.5 && x < 0.5 && y > -0.5 && y < 0.5 &&
-       !(aparent(k,l,0).flags & active)) {
-     FILE * fp = fopen("check_two_one_loc", "w");
-     fprintf (fp,
-       "# %d %d\n"
-       "%g %g\n%g %g\n",
-       k, l,
-       (((point.i - 2) + 0.5)*(1./(1 << point.level)) - 0.5),
-       (((point.j - 2) + 0.5)*(1./(1 << point.level)) - 0.5),
-       x, y);
-     fclose (fp);
-
-
-
-
-
-     if (!(false)) qassert ("/home/mc462/basilisk/src/grid/tree.h", 1623, "false");
-   }
- }end_foreach_leaf();}
+  Multigrid * p = ((Multigrid *)grid);
+  for (int l = 0; l <= depth(); l++) {
+    size_t len = _size(l);
+    p->d[l] = (char *) prealloc (p->d[l], (len*(datasize + size))*sizeof(char),__func__,__FILE__,__LINE__);
+    char * data = p->d[l] + (len - 1)*datasize;
+    for (int i = len - 1; i > 0; i--, data -= datasize)
+      memmove (data + i*size, data, datasize);
+  }
+  datasize += size;
 }
 
 
+int mpi_dims[2], mpi_coords[2];
+#line 806 "/home/mc462/basilisk/src/grid/multigrid.h"
 Point locate (double xp, double yp, double zp)
 {
-  for (int l = depth(); l >= 0; l--) {
-    Point point = {0};int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-    point.level = l;
-    int n = 1 << point.level;
-    point.i = (xp - X0)/L0*n + 2;
-
-    point.j = (yp - Y0)/L0*n + 2;
-
-
-
-
-    if (point.i >= 0 && point.i < n + 2*2
-
- && point.j >= 0 && point.j < n + 2*2
-
-
-
-
- ) {
-      if (allocated(0,0,0) && is_local(cell) && is_leaf(cell))
- return point;
-    }
-    else
-      break;
-  }
   Point point = {0};int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  point.level = -1;
+  point.level = -1, point.n = 1 << depth();
+
+  point.i = (xp - X0)/L0*point.n*mpi_dims[0] + 2 - mpi_coords[0]*point.n;
+  if (point.i < 2 || point.i >= point.n + 2)
+    return point;
+
+  point.j = (yp - Y0)/L0*point.n*mpi_dims[0] + 2 - mpi_coords[1]*point.n;
+  if (point.j < 2 || point.j >= point.n + 2)
+    return point;
+#line 839 "/home/mc462/basilisk/src/grid/multigrid.h"
+  point.level = depth();
   return point;
 }
-
-
-
-bool tree_is_full()
-{
-  { if (((Tree *)grid)->dirty) update_cache_f(); };
-  return (grid->tn == 1L << grid->maxdepth*2);
-}
-
-#line 1 "grid/tree-common.h"
-#line 1 "/home/mc462/basilisk/src/grid/tree-common.h"
-
-
 
 #line 1 "grid/multigrid-common.h"
 #line 1 "/home/mc462/basilisk/src/grid/multigrid-common.h"
@@ -4167,7 +2889,7 @@ void (* debug) (Point);
 
 #undef VARIABLES
 #define VARIABLES\
-  double Delta = L0*(1./(1 << point.level));\
+  double Delta = L0*(1./(1 << point.level)/mpi_dims[0]);\
   double Delta_x = Delta;\
 \
   double Delta_y = Delta;\
@@ -4176,9 +2898,9 @@ void (* debug) (Point);
 \
 \
 \
-  double x = (ig/2. + (point.i - 2) + 0.5)*Delta + X0; NOT_UNUSED(x);\
+  double x = (ig/2. + (point.i - 2 + mpi_coords[0]*(1 << point.level)) + 0.5)*Delta + X0; NOT_UNUSED(x);\
 \
-  double y = (jg/2. + (point.j - 2) + 0.5)*Delta + Y0;\
+  double y = (jg/2. + (point.j - 2 + mpi_coords[1]*(1 << point.level)) + 0.5)*Delta + Y0;\
 \
 \
 \
@@ -4918,18 +3640,7 @@ if (inside && size > 0. &&
   }end_foreach();}
   fflush (fp);
 }
-
-
-static void output_cells_internal (FILE * fp)
-{
-  output_cells (fp
-#line 595
-,( coord) {0}, 0.
-#line 637
-);
-}
-
-
+#line 641 "/home/mc462/basilisk/src/grid/cartesian-common.h"
 static char * replace_ (const char * vname)
 {
   char * name = pstrdup (vname,__func__,__FILE__,__LINE__), * c = name;
@@ -5725,2568 +4436,309 @@ foreach()
     { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->restriction) _b->restriction (_b,((scalar[]) {size,{-1}}), l); };
   }
 }
-#line 5 "/home/mc462/basilisk/src/grid/tree-common.h"
+#line 844 "/home/mc462/basilisk/src/grid/multigrid.h"
 
+void dimensions (int nx, int ny, int nz)
+{
 
+  int p[] = {nx, ny, nz};
+  for (int i = 0; i < 2; i++)
+    mpi_dims[i] = p[i];
 
-
-#line 21 "/home/mc462/basilisk/src/grid/tree-common.h"
-int refine_cell (Point point, scalar * list, int flag, Cache * refined)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  int nr = 0;
-
-
-  if (level > 0)
-    for (int k = 0; k != 2*child.x; k += child.x)
-
-      for (int l = 0; l != 2*child.y; l += child.y)
-
-
-
-
-   if (aparent(k,l,m).pid >= 0 && is_leaf(aparent(k,l,m))) {
-     Point p = point;
-
-
-     p.level = point.level - 1;
-     p.i = (point.i + 2)/2 + k;
-     do { if (p.i < 2) p.i += 1 << p.level; else if (p.i >= 2 + (1 << p.level)) p.i -= 1 << p.level; } while(0);
-
-       p.j = (point.j + 2)/2 + l;
-       do { if (p.j < 2) p.j += 1 << p.level; else if (p.j >= 2 + (1 << p.level)) p.j -= 1 << p.level; } while(0);
-
-
-
-
-
-     nr += refine_cell (p, list, flag, refined);
-     aparent(k,l,m).flags |= flag;
-   }
-
-
-
-  increment_neighbors (point);
-
-  int cflag = is_active(cell) ? (active|leaf) : leaf;
-  {foreach_child()
-    cell.flags |= cflag;end_foreach_child()}
-
-
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    if (is_local(cell) || _attribute[s.i].face)
-      _attribute[s.i].refine (point, s);}}
-
-
-  cell.flags &= ~leaf;
-
-#if 1
-  if (is_border(cell)) {
-    {foreach_child() {
-      bool bord = false;
-      {foreach_neighbor() {
- if (!is_local(cell) || (level > 0 && !is_local(aparent(0,0,0)))) {
-   bord = true; foreach_neighbor_break();
- }
- if (is_refined_check())
-   {foreach_child()
-     if (!is_local(cell)) {
-       bord = true; foreach_child_break();
-     }end_foreach_child()}
- if (bord)
-   foreach_neighbor_break();
-      }end_foreach_neighbor()}
-      if (bord)
- cell.flags |= border;
-    }end_foreach_child()}
-    if (refined)
-      cache_append (refined, point, cell.flags);
-    nr++;
-  }
-#endif
-  return nr;
 }
 
 
 
+#if 2 == 1
 
+#define foreach_slice_x(start, end, l) {\
+  Point point = {0};\
+  point.level = l; point.n = 1 << point.level;\
+  for (point.i = start; point.i < end; point.i++)\
 
-bool coarsen_cell (Point point, scalar * list)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
+#line 862
 
+#define end_foreach_slice_x() }
 
+#elif 2 == 2
 
-  int pid = cell.pid;
-  {foreach_child()
-    if (cell.neighbors || (cell.pid < 0 && cell.pid != pid))
-      return false;end_foreach_child()}
+#define foreach_slice_x(start, end, l) {\
+  Point point = {0};\
+  point.level = l; point.n = 1 << point.level;\
+  for (point.i = start; point.i < end; point.i++)\
+    for (point.j = 0; point.j < point.n + 2*2; point.j++)\
 
+#line 872
 
+#define end_foreach_slice_x() }
 
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
-    _attribute[s.i].restriction (point, s);
-    if (_attribute[s.i].coarsen)
-      _attribute[s.i].coarsen (point, s);
-  }}}
+#define foreach_slice_y(start, end, l) {\
+  Point point = {0};\
+  point.level = l; point.n = 1 << point.level;\
+  for (point.i = 0; point.i < point.n + 2*2; point.i++)\
+    for (point.j = start; point.j < end; point.j++)\
 
+#line 880
 
-  cell.flags |= leaf;
+#define end_foreach_slice_y() }
 
+#elif 2 == 3
 
-  decrement_neighbors (point);
+#define foreach_slice_x(start, end, l) {\
+  Point point = {0};\
+  point.level = l; point.n = 1 << point.level;\
+  for (point.i = start; point.i < end; point.i++)\
+    for (point.j = 0; point.j < point.n + 2*2; point.j++)\
+      for (point.k = 0; point.k < point.n + 2*2; point.k++)\
 
-#if 1
-  if (!is_local(cell)) {
-    cell.flags &= ~(active|border);
-    {foreach_neighbor(1)
-      if (cell.neighbors)
- {foreach_child()
-   if (allocated(0,0,0) && is_local(cell) && !is_border(cell))
-     cell.flags |= border;end_foreach_child()}end_foreach_neighbor()}
-  }
+#line 891
+
+#define end_foreach_slice_x() }
+
+#define foreach_slice_y(start, end, l) {\
+  Point point = {0};\
+  point.level = l; point.n = 1 << point.level;\
+  for (point.i = 0; point.i < point.n + 2*2; point.i++)\
+    for (point.j = start; point.j < end; point.j++)\
+      for (point.k = 0; point.k < point.n + 2*2; point.k++)\
+
+#line 900
+
+#define end_foreach_slice_y() }
+
+#define foreach_slice_z(start, end, l) {\
+  Point point = {0};\
+  point.level = l; point.n = 1 << point.level;\
+  for (point.i = 0; point.i < point.n + 2*2; point.i++)\
+    for (point.j = 0; point.j < point.n + 2*2; point.j++)\
+      for (point.k = start; point.k < end; point.k++)\
+
+#line 909
+
+#define end_foreach_slice_z() }
+
 #endif
 
-  return true;
-}
+#line 1 "grid/multigrid-mpi.h"
+#line 1 "/home/mc462/basilisk/src/grid/multigrid-mpi.h"
 
-void coarsen_cell_recursive (Point point, scalar * list)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-
-  {foreach_child()
-    if (cell.neighbors)
-      {foreach_neighbor(1)
- if ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0))
-   coarsen_cell_recursive (point, list);end_foreach_neighbor()}end_foreach_child()}
-
-  if (!(coarsen_cell (point, list))) qassert ("/home/mc462/basilisk/src/grid/tree-common.h", 148, "coarsen_cell (point, list)");
-}
-
-void mpi_boundary_refine (scalar *);
-void mpi_boundary_coarsen (int, int);
-void mpi_boundary_update (scalar *);
-
-static
-scalar * list_add_depend (scalar * list, scalar s)
-{
-  if (is_constant(s) || _attribute[s.i].restriction == no_restriction)
-    return list;
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar t=*_i;(&t)->i>=0;t=*++_i){
-    if (t.i == s.i)
-      return list;}}
-  {scalar*_i=(scalar*)( _attribute[s.i].depends);if(_i)for(scalar d=*_i;(&d)->i>=0;d=*++_i){
-    list = list_add_depend (list, d);}}
-  return list_append (list, s);
-}
 
 typedef struct {
-  int nc, nf;
-} astats;
-
-     
-astats adapt_wavelet (scalar * slist,
-        double * max,
-        int maxlevel,
-        int minlevel,
-        scalar * list)
-{tracing("adapt_wavelet","/home/mc462/basilisk/src/grid/tree-common.h",173);
-  scalar * ilist = list;
-
-  if (is_constant(cm)) {
-    if (list == NULL || list == all)
-      list = list_copy (all);
-    boundary_internal ((scalar *)list, "/home/mc462/basilisk/src/grid/tree-common.h", 184);
-    restriction (slist);
-  }
-  else {
-    if (list == NULL || list == all) {
-      list = list_copy (((scalar[]){cm, fm.x, fm.y,{-1}}));
-      {scalar*_i=(scalar*)( all);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
- list = list_add (list, s);}}
-    }
-    boundary_internal ((scalar *)list, "/home/mc462/basilisk/src/grid/tree-common.h", 193);
-    scalar * listr = list_concat (slist,((scalar[]) {cm,{-1}}));
-    restriction (listr);
-    pfree (listr,__func__,__FILE__,__LINE__);
-  }
-
-  astats st = {0, 0};
-  scalar * listc = NULL;
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    listc = list_add_depend (listc, s);}}
-
-
-  if (minlevel < 1)
-    minlevel = 1;
-  ((Tree *)grid)->refined.n = 0;
-  static const int refined = 1 << user, too_fine = 1 << (user + 1);
-  {foreach_cell() {
-    if (is_active(cell)) {
-      static const int too_coarse = 1 << (user + 2);
-      if (is_leaf (cell)) {
- if (cell.flags & too_coarse) {
-   cell.flags &= ~too_coarse;
-   refine_cell (point, listc, refined, &((Tree *)grid)->refined);
-   st.nf++;
- }
- continue;
-      }
-      else {
- if (cell.flags & refined) {
-
-   cell.flags &= ~too_coarse;
-   continue;
- }
-
- bool local = is_local(cell);
- if (!local)
-   {foreach_child()
-     if (is_local(cell)) {
-       local = true; foreach_child_break();
-     }end_foreach_child()}
- if (local) {
-   int i = 0;
-   static const int just_fine = 1 << (user + 3);
-   {scalar*_i=(scalar*)( slist);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
-     double emax = max[i++], sc[1 << 2];
-     int c = 0;
-     {foreach_child()
-       sc[c++] = val(s,0,0,0);end_foreach_child()}
-     _attribute[s.i].prolongation (point, s);
-     c = 0;
-     {foreach_child() {
-       double e = fabs(sc[c] - val(s,0,0,0));
-       if (e > emax && level < maxlevel) {
-  cell.flags &= ~too_fine;
-  cell.flags |= too_coarse;
-       }
-       else if ((e <= emax/1.5 || level > maxlevel) &&
-         !(cell.flags & (too_coarse|just_fine))) {
-  if (level >= minlevel)
-    cell.flags |= too_fine;
-       }
-       else if (!(cell.flags & too_coarse)) {
-  cell.flags &= ~too_fine;
-  cell.flags |= just_fine;
-       }
-       val(s,0,0,0) = sc[c++];
-     }end_foreach_child()}
-   }}}
-   {foreach_child() {
-     cell.flags &= ~just_fine;
-     if (!is_leaf(cell)) {
-       cell.flags &= ~too_coarse;
-       if (level >= maxlevel)
-  cell.flags |= too_fine;
-     }
-     else if (!is_active(cell))
-       cell.flags &= ~too_coarse;
-   }end_foreach_child()}
- }
-      }
-    }
-    else
-      continue;
-  }end_foreach_cell();}
-  mpi_boundary_refine (listc);
-
-
-
-  for (int l = depth(); l >= 0; l--) {
-    {foreach_cell()
-      if (!(cell.pid < 0)) {
- if (level == l) {
-   if (!is_leaf(cell)) {
-     if (cell.flags & refined)
-
-       cell.flags &= ~(refined|too_fine);
-     else if (cell.flags & too_fine) {
-       if (is_local(cell) && coarsen_cell (point, listc))
-  st.nc++;
-       cell.flags &= ~too_fine;
-     }
-   }
-   if (cell.flags & too_fine)
-     cell.flags &= ~too_fine;
-   else if (level > 0 && (aparent(0,0,0).flags & too_fine))
-     aparent(0,0,0).flags &= ~too_fine;
-   continue;
- }
- else if (is_leaf(cell))
-   continue;
-      }end_foreach_cell();}
-    mpi_boundary_coarsen (l, too_fine);
-  }
-  pfree (listc,__func__,__FILE__,__LINE__);
-
-  mpi_all_reduce (st.nf, MPI_INT, MPI_SUM);
-  mpi_all_reduce (st.nc, MPI_INT, MPI_SUM);
-  if (st.nc || st.nf)
-    mpi_boundary_update (list);
-
-  if (list != ilist)
-    pfree (list,__func__,__FILE__,__LINE__);
-
-  {end_tracing("adapt_wavelet","/home/mc462/basilisk/src/grid/tree-common.h",316);return st;}
-end_tracing("adapt_wavelet","/home/mc462/basilisk/src/grid/tree-common.h",317);}
-#line 339 "/home/mc462/basilisk/src/grid/tree-common.h"
-static void refine_level (int depth)
-{
-  int refined;
-  do {
-    refined = 0;
-    ((Tree *)grid)->refined.n = 0;
-    {foreach_leaf()
-      if (level < depth) {
- refine_cell (point, NULL, 0, &((Tree *)grid)->refined);
- refined++;
- continue;
-      }end_foreach_leaf();}
-    mpi_all_reduce (refined, MPI_INT, MPI_SUM);
-    if (refined) {
-      mpi_boundary_refine (NULL);
-      mpi_boundary_update (NULL);
-    }
-  } while (refined);
-}
-#line 384 "/home/mc462/basilisk/src/grid/tree-common.h"
-     
-static void halo_face (vectorl vl)
-{tracing("halo_face","/home/mc462/basilisk/src/grid/tree-common.h",385);
-  
-    {scalar*_i=(scalar*)( vl.x);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-      _attribute[s.i].dirty = 2;}}
-    
-#line 388
-{scalar*_i=(scalar*)( vl.y);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-      _attribute[s.i].dirty = 2;}}
-
-  for (int l = depth() - 1; l >= 0; l--)
-    {foreach_halo (prolongation, l)
-      {
-        if (vl.x) {
-#line 403 "/home/mc462/basilisk/src/grid/tree-common.h"
-   if ((!is_leaf (neighbor(-1,0,0)) && neighbor(-1,0,0).neighbors && neighbor(-1,0,0).pid >= 0))
-     {scalar*_i=(scalar*)( vl.x);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-       val(s,0,0,0) = (fine(s,0,0,0) + fine(s,0,1,0))/2.;}}
-   if ((!is_leaf (neighbor(1,0,0)) && neighbor(1,0,0).neighbors && neighbor(1,0,0).pid >= 0))
-     {scalar*_i=(scalar*)( vl.x);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-       val(s,1,0,0) = (fine(s,2,0,0) + fine(s,2,1,0))/2.;}}
-#line 419 "/home/mc462/basilisk/src/grid/tree-common.h"
- }
-        
-#line 394
-if (vl.y) {
-#line 403 "/home/mc462/basilisk/src/grid/tree-common.h"
-   if ((!is_leaf (neighbor(0,-1,0)) && neighbor(0,-1,0).neighbors && neighbor(0,-1,0).pid >= 0))
-     {scalar*_i=(scalar*)( vl.y);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-       val(s,0,0,0) = (fine(s,0,0,0) + fine(s,1,0,0))/2.;}}
-   if ((!is_leaf (neighbor(0,1,0)) && neighbor(0,1,0).neighbors && neighbor(0,1,0).pid >= 0))
-     {scalar*_i=(scalar*)( vl.y);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-       val(s,0,1,0) = (fine(s,0,2,0) + fine(s,1,2,0))/2.;}}
-#line 419 "/home/mc462/basilisk/src/grid/tree-common.h"
- }}end_foreach_halo();}
-end_tracing("halo_face","/home/mc462/basilisk/src/grid/tree-common.h",420);}
-
-
-
-static scalar tree_init_scalar (scalar s, const char * name)
-{
-  s = multigrid_init_scalar (s, name);
-  _attribute[s.i].refine = _attribute[s.i].prolongation;
-  return s;
-}
-
-static void prolongation_vertex (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-  fine(s,1,1,0) = (val(s,0,0,0) + val(s,1,0,0) + val(s,0,1,0) + val(s,1,1,0))/4.;
-
-
-
-
-
-  for (int i = 0; i <= 1; i++) {
-    for (int j = 0; j <= 1; j++)
-
-
-
-
-
-      if (allocated_child(2*i,2*j,0))
- fine(s,2*i,2*j,0) = val(s,i,j,0);
-
-
-    
-      if (neighbor(i,0,0).neighbors) {
-
- fine(s,2*i,1,0) = (val(s,i,0,0) + val(s,i,1,0))/2.;
-#line 464 "/home/mc462/basilisk/src/grid/tree-common.h"
-      }
-      
-#line 452
-if (neighbor(0,i,0).neighbors) {
-
- fine(s,1,2*i,0) = (val(s,0,i,0) + val(s,1,i,0))/2.;
-#line 464 "/home/mc462/basilisk/src/grid/tree-common.h"
-      }
-  }
-}
-
-static scalar tree_init_vertex_scalar (scalar s, const char * name)
-{
-  s = multigrid_init_vertex_scalar (s, name);
-  _attribute[s.i].refine = _attribute[s.i].prolongation = prolongation_vertex;
-  return s;
-}
-
-
-static void refine_face_x (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  vector v = _attribute[s.i].v;
-
-  if (!(!is_leaf (neighbor(-1,0,0)) && neighbor(-1,0,0).neighbors && neighbor(-1,0,0).pid >= 0) &&
-      (is_local(cell) || is_local(neighbor(-1,0,0)))) {
-    double g1 = (val(v.x,0,+1,0) - val(v.x,0,-1,0))/8.;
-    for (int j = 0; j <= 1; j++)
-      fine(v.x,0,j,0) = val(v.x,0,0,0) + (2*j - 1)*g1;
-  }
-  if (!(!is_leaf (neighbor(1,0,0)) && neighbor(1,0,0).neighbors && neighbor(1,0,0).pid >= 0) && neighbor(1,0,0).neighbors &&
-      (is_local(cell) || is_local(neighbor(1,0,0)))) {
-    double g1 = (val(v.x,1,+1,0) - val(v.x,1,-1,0))/8.;
-    for (int j = 0; j <= 1; j++)
-      fine(v.x,2,j,0) = val(v.x,1,0,0) + (2*j - 1)*g1;
-  }
-  if (is_local(cell)) {
-    double g1 = (val(v.x,0,+1,0) - val(v.x,0,-1,0) + val(v.x,1,+1,0) - val(v.x,1,-1,0))/16.;
-    for (int j = 0; j <= 1; j++)
-      fine(v.x,1,j,0) = (val(v.x,0,0,0) + val(v.x,1,0,0))/2. + (2*j - 1)*g1;
-  }
-#line 522 "/home/mc462/basilisk/src/grid/tree-common.h"
-}
-
-#line 476
-static void refine_face_y (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  vector v = _attribute[s.i].v;
-
-  if (!(!is_leaf (neighbor(0,-1,0)) && neighbor(0,-1,0).neighbors && neighbor(0,-1,0).pid >= 0) &&
-      (is_local(cell) || is_local(neighbor(0,-1,0)))) {
-    double g1 = (val(v.y,+1,0,0) - val(v.y,-1,0,0))/8.;
-    for (int j = 0; j <= 1; j++)
-      fine(v.y,j,0,0) = val(v.y,0,0,0) + (2*j - 1)*g1;
-  }
-  if (!(!is_leaf (neighbor(0,1,0)) && neighbor(0,1,0).neighbors && neighbor(0,1,0).pid >= 0) && neighbor(0,1,0).neighbors &&
-      (is_local(cell) || is_local(neighbor(0,1,0)))) {
-    double g1 = (val(v.y,+1,1,0) - val(v.y,-1,1,0))/8.;
-    for (int j = 0; j <= 1; j++)
-      fine(v.y,j,2,0) = val(v.y,0,1,0) + (2*j - 1)*g1;
-  }
-  if (is_local(cell)) {
-    double g1 = (val(v.y,+1,0,0) - val(v.y,-1,0,0) + val(v.y,+1,1,0) - val(v.y,-1,1,0))/16.;
-    for (int j = 0; j <= 1; j++)
-      fine(v.y,j,1,0) = (val(v.y,0,0,0) + val(v.y,0,1,0))/2. + (2*j - 1)*g1;
-  }
-#line 522 "/home/mc462/basilisk/src/grid/tree-common.h"
-}
-
-void refine_face (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  vector v = _attribute[s.i].v;
-  
-    _attribute[v.x.i].prolongation (point, v.x);
-    
-#line 528
-_attribute[v.y.i].prolongation (point, v.y);
-}
-
-void refine_face_solenoidal (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  refine_face (point, s);
-
-  if (is_local(cell)) {
-
-    vector v = _attribute[s.i].v;
-    double d[1 << 2], p[1 << 2];
-    int i = 0;
-    {foreach_child() {
-      d[i] = 0.;
-      
- d[i] += val(v.x,1,0,0) - val(v.x,0,0,0);
- 
-#line 543
-d[i] += val(v.y,0,1,0) - val(v.y,0,0,0);
-      i++;
-    }end_foreach_child()}
-
-    p[0] = 0.;
-    p[1] = (3.*d[3] + d[0])/4. + d[2]/2.;
-    p[2] = (d[3] + 3.*d[0])/4. + d[2]/2.;
-    p[3] = (d[3] + d[0])/2. + d[2];
-    fine(v.x,1,1,0) += p[1] - p[0];
-    fine(v.x,1,0,0) += p[3] - p[2];
-    fine(v.y,0,1,0) += p[0] - p[2];
-    fine(v.y,1,1,0) += p[1] - p[3];
-#line 582 "/home/mc462/basilisk/src/grid/tree-common.h"
-  }
-
-}
-
-vector tree_init_face_vector (vector v, const char * name)
-{
-  v = cartesian_init_face_vector (v, name);
-  
-    _attribute[v.x.i].restriction = _attribute[v.x.i].refine = no_restriction;
-    
-#line 590
-_attribute[v.y.i].restriction = _attribute[v.y.i].refine = no_restriction;
-  _attribute[v.x.i].restriction = restriction_face;
-  _attribute[v.x.i].refine = refine_face;
-  
-    _attribute[v.x.i].prolongation = refine_face_x;
-    
-#line 594
-_attribute[v.y.i].prolongation = refine_face_y;
-  return v;
-}
-
-     
-static void tree_boundary_level (scalar * list, int l)
-{tracing("tree_boundary_level","/home/mc462/basilisk/src/grid/tree-common.h",599);
-  int depth = l < 0 ? depth() : l;
-
-  if (tree_is_full()) {
-    { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->level) _b->level (_b, list, depth); };
-    {end_tracing("tree_boundary_level","/home/mc462/basilisk/src/grid/tree-common.h",605);return;}
-  }
-
-  scalar * listdef = NULL, * listc = NULL, * list2 = NULL, * vlist = NULL;
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    if (!is_constant (s)) {
-      if (_attribute[s.i].restriction == restriction_average) {
- listdef = list_add (listdef, s);
- list2 = list_add (list2, s);
-      }
-      else if (_attribute[s.i].restriction != no_restriction) {
- listc = list_add (listc, s);
- if (_attribute[s.i].face)
-   {
-     list2 = list_add (list2, _attribute[s.i].v.x);
-     
-#line 619
-list2 = list_add (list2, _attribute[s.i].v.y);}
- else {
-   list2 = list_add (list2, s);
-   if (_attribute[s.i].restriction == restriction_vertex)
-     vlist = list_add (vlist, s);
- }
-      }
-    }}}
-
-  if (vlist)
-
-
-
-
-
-
-    {foreach_vertex () {
-      if ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0) || (!is_leaf (neighbor(-1,0,0)) && neighbor(-1,0,0).neighbors && neighbor(-1,0,0).pid >= 0) ||
-   (!is_leaf (neighbor(0,-1,0)) && neighbor(0,-1,0).neighbors && neighbor(0,-1,0).pid >= 0) || (!is_leaf (neighbor(-1,-1,0)) && neighbor(-1,-1,0).neighbors && neighbor(-1,-1,0).pid >= 0)) {
-
- {scalar*_i=(scalar*)( vlist);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-   val(s,0,0,0) = is_vertex (child(0,0,0)) ? fine(s,0,0,0) : 1e30;}}
-      }
-      else
- {
-   if (child.y == 1 &&
-       ((!is_leaf(cell) && !cell.neighbors && cell.pid >= 0) || (!is_leaf(neighbor(-1,0,0)) && !neighbor(-1,0,0).neighbors && neighbor(-1,0,0).pid >= 0))) {
-
-     {scalar*_i=(scalar*)( vlist);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-       val(s,0,0,0) = is_vertex(neighbor(0,-1,0)) && is_vertex(neighbor(0,1,0)) ?
-  (val(s,0,-1,0) + val(s,0,1,0))/2. : 1e30;}}
-   }
-   
-#line 644
-if (child.x == 1 &&
-       ((!is_leaf(cell) && !cell.neighbors && cell.pid >= 0) || (!is_leaf(neighbor(0,-1,0)) && !neighbor(0,-1,0).neighbors && neighbor(0,-1,0).pid >= 0))) {
-
-     {scalar*_i=(scalar*)( vlist);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-       val(s,0,0,0) = is_vertex(neighbor(-1,0,0)) && is_vertex(neighbor(1,0,0)) ?
-  (val(s,-1,0,0) + val(s,1,0,0))/2. : 1e30;}}
-   }}
-    }end_foreach_vertex();}
-#line 684 "/home/mc462/basilisk/src/grid/tree-common.h"
-  pfree (vlist,__func__,__FILE__,__LINE__);
-
-  if (listdef || listc) {
-    { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->restriction) _b->restriction (_b, list2, depth); };
-    for (int l = depth - 1; l >= 0; l--) {
-      {foreach_coarse_level(l) {
- {scalar*_i=(scalar*)( listdef);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-   restriction_average (point, s);}}
- {scalar*_i=(scalar*)( listc);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-   _attribute[s.i].restriction (point, s);}}
-      }end_foreach_coarse_level();}
-      { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->restriction) _b->restriction (_b, list2, l); };
-    }
-    pfree (listdef,__func__,__FILE__,__LINE__);
-    pfree (listc,__func__,__FILE__,__LINE__);
-    pfree (list2,__func__,__FILE__,__LINE__);
-  }
-
-  scalar * listr = NULL;
-  vector * listf = NULL;
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    if (!is_constant (s) && _attribute[s.i].refine != no_restriction) {
-      if (_attribute[s.i].face)
- listf = vectors_add (listf, _attribute[s.i].v);
-      else
- listr = list_add (listr, s);
-    }}}
-
-  if (listr || listf) {
-    { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->level) _b->level (_b, list, 0); };
-    for (int i = 0; i < depth; i++) {
-      {foreach_halo (prolongation, i) {
- {scalar*_i=(scalar*)( listr);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-          _attribute[s.i].prolongation (point, s);}}
- {vector*_i=(vector*)( listf);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
-   {
-     _attribute[v.x.i].prolongation (point, v.x);
-     
-#line 720
-_attribute[v.y.i].prolongation (point, v.y);}}}
-      }end_foreach_halo();}
-      { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->level) _b->level (_b, list, i + 1); };
-    }
-    pfree (listr,__func__,__FILE__,__LINE__);
-    pfree (listf,__func__,__FILE__,__LINE__);
-  }
-end_tracing("tree_boundary_level","/home/mc462/basilisk/src/grid/tree-common.h",727);}
-
-double treex (Point point) {int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  if (level == 0)
-    return 0;
-
-  double i = 2*child.x - child.y;
-  if (i <= 1 && i >= -1) i = -i;
-
-
-
-
-  return treex(parent) + i/(1 << 2*(level - 1));
-}
-
-double treey (Point point) {int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  if (level == 0)
-    return 0;
-  return treey(parent) + 4./(1 << 2*(level - 1));
-}
-
-void output_tree (FILE * fp)
-{
-  {foreach_cell()
-    if (cell.neighbors)
-      {foreach_child()
- if (is_local(cell))
-   fprintf (fp, "%g %g\n%g %g\n\n",
-     treex(parent), treey(parent), treex(point), treey(point));end_foreach_child()}end_foreach_cell();}
-}
-
-     
-void tree_check()
-{tracing("tree_check","/home/mc462/basilisk/src/grid/tree-common.h",759);
-
-
-  long nleaves = 0, nactive = 0;
-  {foreach_cell_all() {
-    if (is_leaf(cell)) {
-      if (!(cell.pid >= 0)) qassert ("/home/mc462/basilisk/src/grid/tree-common.h", 766, "cell.pid >= 0");
-      nleaves++;
-    }
-    if (is_local(cell))
-      if (!(is_active(cell) || (!is_leaf(cell) && !cell.neighbors && cell.pid >= 0))) qassert ("/home/mc462/basilisk/src/grid/tree-common.h", 770, "is_active(cell) || is_prolongation(cell)");
-    if (is_active(cell))
-      nactive++;
-
-    int neighbors = 0;
-    {foreach_neighbor(1)
-      if (allocated(0,0,0) && (!is_leaf (cell) && cell.neighbors && cell.pid >= 0))
- neighbors++;end_foreach_neighbor()}
-    if (!(cell.neighbors == neighbors)) qassert ("/home/mc462/basilisk/src/grid/tree-common.h", 778, "cell.neighbors == neighbors");
-
-
-    if (!cell.neighbors)
-      if (!(!allocated_child(0,0,0))) qassert ("/home/mc462/basilisk/src/grid/tree-common.h", 782, "!allocated_child(0)");
-  }end_foreach_cell_all();}
-
-
-  long reachable = 0;
-  {foreach_cell() {
-    if (is_active(cell))
-      reachable++;
-    else
-      continue;
-  }end_foreach_cell();}
-  if (!(nactive == reachable)) qassert ("/home/mc462/basilisk/src/grid/tree-common.h", 793, "nactive == reachable");
-
-
-  reachable = 0;
-  {foreach_cell()
-    if (is_leaf(cell)) {
-      reachable++;
-      continue;
-    }end_foreach_cell();}
-  if (!(nleaves == reachable)) qassert ("/home/mc462/basilisk/src/grid/tree-common.h", 802, "nleaves == reachable");
-end_tracing("tree_check","/home/mc462/basilisk/src/grid/tree-common.h",803);}
-
-     
-static void tree_restriction (scalar * list) {tracing("tree_restriction","/home/mc462/basilisk/src/grid/tree-common.h",806);
-  boundary_internal ((scalar *)list, "/home/mc462/basilisk/src/grid/tree-common.h", 807);
-  if (tree_is_full())
-    multigrid_restriction (list);
-end_tracing("tree_restriction","/home/mc462/basilisk/src/grid/tree-common.h",810);}
-
-void tree_methods()
-{
-  multigrid_methods();
-  init_scalar = tree_init_scalar;
-  init_vertex_scalar = tree_init_vertex_scalar;
-  init_face_vector = tree_init_face_vector;
-  boundary_level = tree_boundary_level;
-  boundary_face = halo_face;
-  restriction = tree_restriction;
-}
-#line 1670 "/home/mc462/basilisk/src/grid/tree.h"
-
-
-void tree_periodic (int dir)
-{
-  int depth = grid ? depth() : -1;
-  if (grid)
-    free_grid();
-  periodic (dir);
-  if (depth >= 0)
-    init_grid (1 << depth);
-}
-
-
-#if 1
-#line 1 "grid/tree-mpi.h"
-#line 1 "/home/mc462/basilisk/src/grid/tree-mpi.h"
-
-int debug_iteration = -1;
-
-void debug_mpi (FILE * fp1);
-
-typedef struct {
-  CacheLevel * halo;
-  void * buf;
-  MPI_Request r;
-  int depth;
-  int pid;
-  int maxdepth;
-} Rcv;
-
-typedef struct {
-  Rcv * rcv;
-  char * name;
-  int npid;
-} RcvPid;
-
-typedef struct {
-  RcvPid * rcv, * snd;
-} SndRcv;
-
-typedef struct {
-  Boundary parent;
-
-  SndRcv mpi_level, mpi_level_root, restriction;
-  Array * send, * receive;
+  Boundary b;
+  MPI_Comm cartcomm;
 } MpiBoundary;
 
-static void cache_level_init (CacheLevel * c)
+
+static void * snd_x (int i, int dst, int tag, int level, scalar * list,
+       MPI_Request * req)
 {
-  c->p = NULL;
-  c->n = c->nm = 0;
+  if (dst == MPI_PROC_NULL)
+    return NULL;
+  size_t size = 0;
+  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
+    size += _attribute[s.i].block;}}
+  size *= pow((1 << level) + 2*2, 2 - 1)*2*sizeof(double);
+  double * buf = (double *) pmalloc (size,__func__,__FILE__,__LINE__), * b = buf;
+  {foreach_slice_x (i, i + 2, level)
+    {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
+      memcpy (b, &val(s,0,0,0), sizeof(double)*_attribute[s.i].block);
+      b += _attribute[s.i].block;
+    }}}end_foreach_slice_x();}
+  MPI_Isend (buf, size, MPI_BYTE, dst, tag, MPI_COMM_WORLD, req);
+  return buf;
 }
 
-static void rcv_append (Point point, Rcv * rcv)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  if (level > rcv->depth) {
-    rcv->halo = (CacheLevel *) prealloc (rcv->halo, (level + 1)*sizeof(CacheLevel),__func__,__FILE__,__LINE__);
-    for (int j = rcv->depth + 1; j <= level; j++)
-      cache_level_init (&rcv->halo[j]);
-    rcv->depth = level;
-  }
-  cache_level_append (&rcv->halo[level], point);
-  if (level > rcv->maxdepth)
-    rcv->maxdepth = level;
-}
-
-void rcv_print (Rcv * rcv, FILE * fp, const char * prefix)
+#line 9
+static void * snd_y (int i, int dst, int tag, int level, scalar * list,
+       MPI_Request * req)
 {
-  for (int l = 0; l <= rcv->depth; l++)
-    if (rcv->halo[l].n > 0)
-      {foreach_cache_level(rcv->halo[l], l)
- fprintf (fp, "%s%g %g %g %d %d\n", prefix, x, y, z, rcv->pid, level);end_foreach_cache_level();}
+  if (dst == MPI_PROC_NULL)
+    return NULL;
+  size_t size = 0;
+  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
+    size += _attribute[s.i].block;}}
+  size *= pow((1 << level) + 2*2, 2 - 1)*2*sizeof(double);
+  double * buf = (double *) pmalloc (size,__func__,__FILE__,__LINE__), * b = buf;
+  {foreach_slice_y (i, i + 2, level)
+    {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
+      memcpy (b, &val(s,0,0,0), sizeof(double)*_attribute[s.i].block);
+      b += _attribute[s.i].block;
+    }}}end_foreach_slice_y();}
+  MPI_Isend (buf, size, MPI_BYTE, dst, tag, MPI_COMM_WORLD, req);
+  return buf;
 }
 
-static void rcv_free_buf (Rcv * rcv)
+
+static void rcv_x (int i, int src, int tag, int level, scalar * list)
 {
-  if (rcv->buf) {
-    prof_start ("rcv_pid_receive");
-    MPI_Wait (&rcv->r, MPI_STATUS_IGNORE);
-    pfree (rcv->buf,__func__,__FILE__,__LINE__);
-    rcv->buf = NULL;
-    prof_stop();
-  }
-}
-
-static void rcv_destroy (Rcv * rcv)
-{
-  rcv_free_buf (rcv);
-  for (int i = 0; i <= rcv->depth; i++)
-    if (rcv->halo[i].n > 0)
-      pfree (rcv->halo[i].p,__func__,__FILE__,__LINE__);
-  pfree (rcv->halo,__func__,__FILE__,__LINE__);
-}
-
-static RcvPid * rcv_pid_new (const char * name)
-{
-  RcvPid * r = ((RcvPid *) pcalloc (1, sizeof(RcvPid),__func__,__FILE__,__LINE__));
-  r->name = pstrdup (name,__func__,__FILE__,__LINE__);
-  return r;
-}
-
-static Rcv * rcv_pid_pointer (RcvPid * p, int pid)
-{
-  if (!(pid >= 0 && pid < npe())) qassert ("/home/mc462/basilisk/src/grid/tree-mpi.h", 88, "pid >= 0 && pid < npe()");
-
-  int i;
-  for (i = 0; i < p->npid; i++)
-    if (pid == p->rcv[i].pid)
-      break;
-
-  if (i == p->npid) {
-    p->rcv = (Rcv *) prealloc (p->rcv, (++p->npid)*sizeof(Rcv),__func__,__FILE__,__LINE__);
-    Rcv * rcv = &p->rcv[p->npid-1];
-    rcv->pid = pid;
-    rcv->depth = rcv->maxdepth = 0;
-    rcv->halo = ((CacheLevel *) pmalloc ((1)*sizeof(CacheLevel),__func__,__FILE__,__LINE__));
-    rcv->buf = NULL;
-    cache_level_init (&rcv->halo[0]);
-  }
-  return &p->rcv[i];
-}
-
-static void rcv_pid_append (RcvPid * p, int pid, Point point)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  rcv_append (point, rcv_pid_pointer (p, pid));
-}
-
-static void rcv_pid_append_pids (RcvPid * p, Array * pids)
-{
-
-  for (int i = 0; i < p->npid; i++) {
-    int pid = p->rcv[i].pid, j, * a;
-    for (j = 0, a = pids->p; j < pids->len/sizeof(int); j++,a++)
-      if (*a == pid)
- break;
-    if (j == pids->len/sizeof(int))
-      array_append (pids, &pid, sizeof(int));
-  }
-}
-
-void rcv_pid_write (RcvPid * p, const char * name)
-{
-  for (int i = 0; i < p->npid; i++) {
-    Rcv * rcv = &p->rcv[i];
-    char fname[80];
-    sprintf (fname, "%s-%d-%d", name, pid(), rcv->pid);
-    FILE * fp = fopen (fname, "w");
-    rcv_print (rcv, fp, "");
-    fclose (fp);
-  }
-}
-
-static void rcv_pid_print (RcvPid * p, FILE * fp, const char * prefix)
-{
-  for (int i = 0; i < p->npid; i++)
-    rcv_print (&p->rcv[i], fp, prefix);
-}
-
-static void rcv_pid_destroy (RcvPid * p)
-{
-  for (int i = 0; i < p->npid; i++)
-    rcv_destroy (&p->rcv[i]);
-  pfree (p->rcv,__func__,__FILE__,__LINE__);
-  pfree (p->name,__func__,__FILE__,__LINE__);
-  pfree (p,__func__,__FILE__,__LINE__);
-}
-
-static Boundary * mpi_boundary = NULL;
-
-
-
-
-
-
-void debug_mpi (FILE * fp1);
-
-static void apply_bc (Rcv * rcv, scalar * list, scalar * listv,
-        vector * listf, int l, MPI_Status s)
-{
-  double * b = rcv->buf;
-  {foreach_cache_level(rcv->halo[l], l) {
+  if (src == MPI_PROC_NULL)
+    return;
+  size_t size = 0;
+  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
+    size += _attribute[s.i].block;}}
+  size *= pow((1 << level) + 2*2, 2 - 1)*2*sizeof(double);
+  double * buf = (double *) pmalloc (size,__func__,__FILE__,__LINE__), * b = buf;
+  MPI_Status s;
+  MPI_Recv (buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &s);
+  {foreach_slice_x (i, i + 2, level)
     {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
       memcpy (&val(s,0,0,0), b, sizeof(double)*_attribute[s.i].block);
       b += _attribute[s.i].block;
-    }}}
-    {vector*_i=(vector*)( listf);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
-      { {
- memcpy (&val(v.x,0,0,0), b, sizeof(double)*_attribute[v.x.i].block);
- b += _attribute[v.x.i].block;
- if (*b != 1e30 && allocated(1,0,0))
-   memcpy (&val(v.x,1,0,0), b, sizeof(double)*_attribute[v.x.i].block);
- b += _attribute[v.x.i].block;
-      } 
-#line 171
-{
- memcpy (&val(v.y,0,0,0), b, sizeof(double)*_attribute[v.y.i].block);
- b += _attribute[v.y.i].block;
- if (*b != 1e30 && allocated(0,1,0))
-   memcpy (&val(v.y,0,1,0), b, sizeof(double)*_attribute[v.y.i].block);
- b += _attribute[v.y.i].block;
-      }}}}
-    {scalar*_i=(scalar*)( listv);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
-      for (int i = 0; i <= 1; i++)
- for (int j = 0; j <= 1; j++)
-
-
-
-
-
-
-
-          {
-     if (*b != 1e30 && allocated(i,j,0))
-       memcpy (&val(s,i,j,0), b, sizeof(double)*_attribute[s.i].block);
-     b += _attribute[s.i].block;
-          }
-
-    }}}
-  }end_foreach_cache_level();}
-  size_t size = b - (double *) rcv->buf;
-  pfree (rcv->buf,__func__,__FILE__,__LINE__);
-  rcv->buf = NULL;
-
-  int rlen;
-  MPI_Get_count (&s, MPI_DOUBLE, &rlen);
-  if (rlen != size) {
-    fprintf (ferr,
-      "rlen (%d) != size (%ld), %d receiving from %d at level %d\n"
-      "Calling debug_mpi(NULL)...\n"
-      "Aborting...\n",
-      rlen, size, pid(), rcv->pid, l);
-    fflush (ferr);
-    debug_mpi (NULL);
-    MPI_Abort (MPI_COMM_WORLD, -2);
-  }
+    }}}end_foreach_slice_x();}
+  pfree (buf,__func__,__FILE__,__LINE__);
 }
-#line 234 "/home/mc462/basilisk/src/grid/tree-mpi.h"
-static void mpi_recv_check (void * buf, int count, MPI_Datatype datatype,
-       int source, int tag,
-       MPI_Comm comm, MPI_Status * status,
-       const char * name)
+
+#line 29
+static void rcv_y (int i, int src, int tag, int level, scalar * list)
 {
-#line 269 "/home/mc462/basilisk/src/grid/tree-mpi.h"
-  int errorcode = MPI_Recv (buf, count, datatype, source, tag, comm, status);
-  if (errorcode != MPI_SUCCESS) {
-    char string[MPI_MAX_ERROR_STRING];
-    int resultlen;
-    MPI_Error_string (errorcode, string, &resultlen);
-    fprintf (ferr,
-      "ERROR MPI_Recv \"%s\" (count = %d, source = %d, tag = %d):\n%s\n"
-      "Calling debug_mpi(NULL)...\n"
-      "Aborting...\n",
-      name, count, source, tag, string);
-    fflush (ferr);
-    debug_mpi (NULL);
-    MPI_Abort (MPI_COMM_WORLD, -1);
-  }
-
-
-
-
-
+  if (src == MPI_PROC_NULL)
+    return;
+  size_t size = 0;
+  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
+    size += _attribute[s.i].block;}}
+  size *= pow((1 << level) + 2*2, 2 - 1)*2*sizeof(double);
+  double * buf = (double *) pmalloc (size,__func__,__FILE__,__LINE__), * b = buf;
+  MPI_Status s;
+  MPI_Recv (buf, size, MPI_BYTE, src, tag, MPI_COMM_WORLD, &s);
+  {foreach_slice_y (i, i + 2, level)
+    {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
+      memcpy (&val(s,0,0,0), b, sizeof(double)*_attribute[s.i].block);
+      b += _attribute[s.i].block;
+    }}}end_foreach_slice_y();}
+  pfree (buf,__func__,__FILE__,__LINE__);
 }
 
      
-static int mpi_waitany (int count, MPI_Request array_of_requests[], int *indx,
-   MPI_Status *status)
-{tracing("mpi_waitany","/home/mc462/basilisk/src/grid/tree-mpi.h",291);
-  { int _ret= MPI_Waitany (count, array_of_requests, indx, status);end_tracing("mpi_waitany","/home/mc462/basilisk/src/grid/tree-mpi.h",294);return _ret;}
-end_tracing("mpi_waitany","/home/mc462/basilisk/src/grid/tree-mpi.h",295);}
-
-static int list_lenb (scalar * list) {
-  int len = 0;
+static void mpi_boundary_level (const Boundary * b, scalar * list, int level)
+{tracing("mpi_boundary_level","/home/mc462/basilisk/src/grid/multigrid-mpi.h",49);
+  scalar * list1 = NULL;
   {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    len += _attribute[s.i].block;}}
-  return len;
-}
+    if (!is_constant(s) && _attribute[s.i].block > 0)
+      list1 = list_add (list1, s);}}
+  if (!list1)
+    {end_tracing("mpi_boundary_level","/home/mc462/basilisk/src/grid/multigrid-mpi.h",56);return;}
 
-static int vectors_lenb (vector * list) {
-  int len = 0;
-  {vector*_i=(vector*)( list);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
-    len += _attribute[v.x.i].block;}}
-  return len;
-}
+  prof_start ("mpi_boundary_level");
 
-static void rcv_pid_receive (RcvPid * m, scalar * list, scalar * listv,
-        vector * listf, int l)
+  if (level < 0) level = depth();
+  MpiBoundary * mpi = (MpiBoundary *) b;
+  struct { int x, y, z; } dir = {0,1,2};
+   {
+    int left, right;
+    MPI_Cart_shift (mpi->cartcomm, dir.x, 1, &left, &right);
+    MPI_Request reqs[2];
+    void * buf[2];
+    int npl = (1 << level) + 2*2, nr = 0;
+    if ((buf[0] = snd_x (npl - 2*2, right, 0, level, list1, &reqs[nr])))
+      nr++;
+    if ((buf[1] = snd_x (2, left, 1, level, list1, &reqs[nr])))
+      nr++;
+    rcv_x (0, left, 0, level, list1);
+    rcv_x (npl - 2, right, 1, level, list1);
+    MPI_Status stats[nr];
+    MPI_Waitall (nr, reqs, stats);
+    pfree (buf[0],__func__,__FILE__,__LINE__); pfree (buf[1],__func__,__FILE__,__LINE__);
+  } 
+#line 63
 {
-  if (m->npid == 0)
-    return;
-
-  prof_start ("rcv_pid_receive");
-
-  int len = list_lenb (list) + 2*2*vectors_lenb (listf) +
-    (1 << 2)*list_lenb (listv);
-
-  MPI_Request r[m->npid];
-  Rcv * rrcv[m->npid];
-  int nr = 0;
-  for (int i = 0; i < m->npid; i++) {
-    Rcv * rcv = &m->rcv[i];
-    if (l <= rcv->depth && rcv->halo[l].n > 0) {
-      if (!(!rcv->buf)) qassert ("/home/mc462/basilisk/src/grid/tree-mpi.h", 328, "!rcv->buf");
-      rcv->buf = pmalloc (sizeof (double)*rcv->halo[l].n*len,__func__,__FILE__,__LINE__);
-
-
-
-
-
-
-      MPI_Irecv (rcv->buf, rcv->halo[l].n*len, MPI_DOUBLE, rcv->pid,
-   (l), MPI_COMM_WORLD, &r[nr]);
-      rrcv[nr++] = rcv;
-
-
-
-
-
-
-    }
+    int bottom, top;
+    MPI_Cart_shift (mpi->cartcomm, dir.y, 1, &bottom, &top);
+    MPI_Request reqs[2];
+    void * buf[2];
+    int npl = (1 << level) + 2*2, nr = 0;
+    if ((buf[0] = snd_y (npl - 2*2, top, 0, level, list1, &reqs[nr])))
+      nr++;
+    if ((buf[1] = snd_y (2, bottom, 1, level, list1, &reqs[nr])))
+      nr++;
+    rcv_y (0, bottom, 0, level, list1);
+    rcv_y (npl - 2, top, 1, level, list1);
+    MPI_Status stats[nr];
+    MPI_Waitall (nr, reqs, stats);
+    pfree (buf[0],__func__,__FILE__,__LINE__); pfree (buf[1],__func__,__FILE__,__LINE__);
   }
 
-
-  if (nr > 0) {
-    int i;
-    MPI_Status s;
-    mpi_waitany (nr, r, &i, &s);
-    while (i != MPI_UNDEFINED) {
-      Rcv * rcv = rrcv[i];
-      if (!(l <= rcv->depth && rcv->halo[l].n > 0)) qassert ("/home/mc462/basilisk/src/grid/tree-mpi.h", 355, "l <= rcv->depth && rcv->halo[l].n > 0");
-      if (!(rcv->buf)) qassert ("/home/mc462/basilisk/src/grid/tree-mpi.h", 356, "rcv->buf");
-      apply_bc (rcv, list, listv, listf, l, s);
-      mpi_waitany (nr, r, &i, &s);
-    }
-  }
+  pfree (list1,__func__,__FILE__,__LINE__);
 
   prof_stop();
-}
-
-     
-static void rcv_pid_wait (RcvPid * m)
-{tracing("rcv_pid_wait","/home/mc462/basilisk/src/grid/tree-mpi.h",366);
-
-  for (int i = 0; i < m->npid; i++)
-    rcv_free_buf (&m->rcv[i]);
-end_tracing("rcv_pid_wait","/home/mc462/basilisk/src/grid/tree-mpi.h",371);}
-
-static void rcv_pid_send (RcvPid * m, scalar * list, scalar * listv,
-     vector * listf, int l)
-{
-  if (m->npid == 0)
-    return;
-
-  prof_start ("rcv_pid_send");
-
-  int len = list_lenb (list) + 2*2*vectors_lenb (listf) +
-    (1 << 2)*list_lenb (listv);
-
-
-  for (int i = 0; i < m->npid; i++) {
-    Rcv * rcv = &m->rcv[i];
-    if (l <= rcv->depth && rcv->halo[l].n > 0) {
-      if (!(!rcv->buf)) qassert ("/home/mc462/basilisk/src/grid/tree-mpi.h", 388, "!rcv->buf");
-      rcv->buf = pmalloc (sizeof (double)*rcv->halo[l].n*len,__func__,__FILE__,__LINE__);
-      double * b = rcv->buf;
-      {foreach_cache_level(rcv->halo[l], l) {
- {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
-   memcpy (b, &val(s,0,0,0), sizeof(double)*_attribute[s.i].block);
-   b += _attribute[s.i].block;
- }}}
- {vector*_i=(vector*)( listf);if(_i)for(vector v=*_i;(&v)->x.i>=0;v=*++_i){
-   { {
-     memcpy (b, &val(v.x,0,0,0), sizeof(double)*_attribute[v.x.i].block);
-     b += _attribute[v.x.i].block;
-     if (allocated(1,0,0))
-       memcpy (b, &val(v.x,1,0,0), sizeof(double)*_attribute[v.x.i].block);
-     else
-       *b = 1e30;
-     b += _attribute[v.x.i].block;
-   } 
-#line 397
-{
-     memcpy (b, &val(v.y,0,0,0), sizeof(double)*_attribute[v.y.i].block);
-     b += _attribute[v.y.i].block;
-     if (allocated(0,1,0))
-       memcpy (b, &val(v.y,0,1,0), sizeof(double)*_attribute[v.y.i].block);
-     else
-       *b = 1e30;
-     b += _attribute[v.y.i].block;
-   }}}}
- {scalar*_i=(scalar*)( listv);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
-   for (int i = 0; i <= 1; i++)
-     for (int j = 0; j <= 1; j++)
-#line 418 "/home/mc462/basilisk/src/grid/tree-mpi.h"
-       {
-  if (allocated(i,j,0))
-    memcpy (b, &val(s,i,j,0), sizeof(double)*_attribute[s.i].block);
-  else
-    *b = 1e30;
-  b += _attribute[s.i].block;
-       }
-
- }}}
-      }end_foreach_cache_level();}
-
-
-
-
-
-      MPI_Isend (rcv->buf, (b - (double *) rcv->buf),
-   MPI_DOUBLE, rcv->pid, (l), MPI_COMM_WORLD,
-   &rcv->r);
-    }
-  }
-
-  prof_stop();
-}
-
-static void rcv_pid_sync (SndRcv * m, scalar * list, int l)
-{
-  scalar * listr = NULL, * listv = NULL;
-  vector * listf = NULL;
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    if (!is_constant(s) && _attribute[s.i].block > 0) {
-      if (_attribute[s.i].face)
- listf = vectors_add (listf, _attribute[s.i].v);
-      else if (_attribute[s.i].restriction == restriction_vertex)
- listv = list_add (listv, s);
-      else
- listr = list_add (listr, s);
-    }}}
-  rcv_pid_send (m->snd, listr, listv, listf, l);
-  rcv_pid_receive (m->rcv, listr, listv, listf, l);
-  rcv_pid_wait (m->snd);
-  pfree (listr,__func__,__FILE__,__LINE__);
-  pfree (listf,__func__,__FILE__,__LINE__);
-  pfree (listv,__func__,__FILE__,__LINE__);
-}
-
-static void snd_rcv_destroy (SndRcv * m)
-{
-  rcv_pid_destroy (m->rcv);
-  rcv_pid_destroy (m->snd);
-}
-
-static void snd_rcv_init (SndRcv * m, const char * name)
-{
-  char s[strlen(name) + 5];
-  strcpy (s, name);
-  strcat (s, ".rcv");
-  m->rcv = rcv_pid_new (s);
-  strcpy (s, name);
-  strcat (s, ".snd");
-  m->snd = rcv_pid_new (s);
-}
+end_tracing("mpi_boundary_level","/home/mc462/basilisk/src/grid/multigrid-mpi.h",83);}
 
 static void mpi_boundary_destroy (Boundary * b)
 {
   MpiBoundary * m = (MpiBoundary *) b;
-  snd_rcv_destroy (&m->mpi_level);
-  snd_rcv_destroy (&m->mpi_level_root);
-  snd_rcv_destroy (&m->restriction);
-  array_free (m->send);
-  array_free (m->receive);
+  MPI_Comm_free (&m->cartcomm);
   pfree (m,__func__,__FILE__,__LINE__);
 }
 
-     
-static void mpi_boundary_level (const Boundary * b, scalar * list, int l)
-{tracing("mpi_boundary_level","/home/mc462/basilisk/src/grid/tree-mpi.h",492);
-  MpiBoundary * m = (MpiBoundary *) b;
-  rcv_pid_sync (&m->mpi_level, list, l);
-  rcv_pid_sync (&m->mpi_level_root, list, l);
-end_tracing("mpi_boundary_level","/home/mc462/basilisk/src/grid/tree-mpi.h",497);}
-
-     
-static void mpi_boundary_restriction (const Boundary * b, scalar * list, int l)
-{tracing("mpi_boundary_restriction","/home/mc462/basilisk/src/grid/tree-mpi.h",500);
-  MpiBoundary * m = (MpiBoundary *) b;
-  rcv_pid_sync (&m->restriction, list, l);
-end_tracing("mpi_boundary_restriction","/home/mc462/basilisk/src/grid/tree-mpi.h",504);}
-
-void mpi_boundary_new()
+Boundary * mpi_boundary_new()
 {
-  mpi_boundary = (Boundary *) ((MpiBoundary *) pcalloc (1, sizeof(MpiBoundary),__func__,__FILE__,__LINE__));
-  mpi_boundary->destroy = mpi_boundary_destroy;
-  mpi_boundary->level = mpi_boundary_level;
-  mpi_boundary->restriction = mpi_boundary_restriction;
-  MpiBoundary * mpi = (MpiBoundary *) mpi_boundary;
-  snd_rcv_init (&mpi->mpi_level, "mpi_level");
-  snd_rcv_init (&mpi->mpi_level_root, "mpi_level_root");
-  snd_rcv_init (&mpi->restriction, "restriction");
-  mpi->send = array_new();
-  mpi->receive = array_new();
-  add_boundary (mpi_boundary);
-}
-
-static FILE * fopen_prefix (FILE * fp, const char * name, char * prefix)
-{
-  if (fp) {
-    sprintf (prefix, "%s-%d ", name, pid());
-    return fp;
-  }
-  else {
-    strcpy (prefix, "");
-    char fname[80];
-    if (debug_iteration >= 0)
-      sprintf (fname, "%s-%d-%d", name, debug_iteration, pid());
-    else
-      sprintf (fname, "%s-%d", name, pid());
-    return fopen (fname, "w");
-  }
-}
-
-void debug_mpi (FILE * fp1)
-{
-  void output_cells_internal (FILE * fp);
-
-  char prefix[80];
-  FILE * fp;
+  MpiBoundary * m = ((MpiBoundary *) pcalloc (1, sizeof(MpiBoundary),__func__,__FILE__,__LINE__));
+  MPI_Dims_create (npe(), 2, mpi_dims);
+  MPI_Cart_create (MPI_COMM_WORLD, 2,
+     mpi_dims, &Period.x, 0, &m->cartcomm);
+  MPI_Cart_coords (m->cartcomm, pid(), 2, mpi_coords);
 
 
-  if (fp1 == NULL) {
-    char name[80];
-    sprintf (name, "halo-%d", pid()); remove (name);
-    sprintf (name, "cells-%d", pid()); remove (name);
-    sprintf (name, "faces-%d", pid()); remove (name);
-    sprintf (name, "vertices-%d", pid()); remove (name);
-    sprintf (name, "neighbors-%d", pid()); remove (name);
-    sprintf (name, "mpi-level-rcv-%d", pid()); remove (name);
-    sprintf (name, "mpi-level-snd-%d", pid()); remove (name);
-    sprintf (name, "mpi-level-root-rcv-%d", pid()); remove (name);
-    sprintf (name, "mpi-level-root-snd-%d", pid()); remove (name);
-    sprintf (name, "mpi-restriction-rcv-%d", pid()); remove (name);
-    sprintf (name, "mpi-restriction-snd-%d", pid()); remove (name);
-    sprintf (name, "mpi-border-%d", pid()); remove (name);
-    sprintf (name, "exterior-%d", pid()); remove (name);
-    sprintf (name, "depth-%d", pid()); remove (name);
-    sprintf (name, "refined-%d", pid()); remove (name);
-  }
-
-
-  fp = fopen_prefix (fp1, "halo", prefix);
-  for (int l = 0; l < depth(); l++)
-    {foreach_halo (prolongation, l)
-      {foreach_child()
-        fprintf (fp, "%s%g %g %g %d\n", prefix, x, y, z, level);end_foreach_child()}end_foreach_halo();}
-  if (!fp1)
-    fclose (fp);
-
-  if (!fp1) {
-    fp = fopen_prefix (fp1, "cells", prefix);
-    output_cells_internal (fp);
-    fclose (fp);
-  }
-
-  fp = fopen_prefix (fp1, "faces", prefix);
-  {foreach_face_generic(){is_face_x(){
-    fprintf (fp, "%s%g %g %g %d\n", prefix, x, y, z, level);}end_is_face_x()
-#line 581
-is_face_y(){
-    fprintf (fp, "%s%g %g %g %d\n", prefix, x, y, z, level);}end_is_face_y()}end_foreach_face_generic();}
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "vertices", prefix);
-  {foreach_vertex()
-    fprintf (fp, "%s%g %g %g %d\n", prefix, x, y, z, level);end_foreach_vertex();}
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "neighbors", prefix);
-  {foreach() {
-    int n = 0;
-    {foreach_neighbor(1)
-      if ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0))
- n++;end_foreach_neighbor()}
-    fprintf (fp, "%s%g %g %g %d\n", prefix, x, y, z, cell.neighbors);
-    if (!(cell.neighbors == n)) qassert ("/home/mc462/basilisk/src/grid/tree-mpi.h", 599, "cell.neighbors == n");
-  }end_foreach();}
-  if (!fp1)
-    fclose (fp);
-
-  MpiBoundary * mpi = (MpiBoundary *) mpi_boundary;
-
-  fp = fopen_prefix (fp1, "mpi-level-rcv", prefix);
-  rcv_pid_print (mpi->mpi_level.rcv, fp, prefix);
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "mpi-level-root-rcv", prefix);
-  rcv_pid_print (mpi->mpi_level_root.rcv, fp, prefix);
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "mpi-restriction-rcv", prefix);
-  rcv_pid_print (mpi->restriction.rcv, fp, prefix);
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "mpi-level-snd", prefix);
-  rcv_pid_print (mpi->mpi_level.snd, fp, prefix);
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "mpi-level-root-snd", prefix);
-  rcv_pid_print (mpi->mpi_level_root.snd, fp, prefix);
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "mpi-restriction-snd", prefix);
-  rcv_pid_print (mpi->restriction.snd, fp, prefix);
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "mpi-border", prefix);
-  {foreach_cell() {
-    if (is_border(cell))
-      fprintf (fp, "%s%g %g %g %d %d %d\n",
-        prefix, x, y, z, level, cell.neighbors, cell.pid);
-    else
-      continue;
-    if (is_leaf(cell))
-      continue;
-  }end_foreach_cell();}
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "exterior", prefix);
-  {foreach_cell() {
-    if (!is_local(cell))
-      fprintf (fp, "%s%g %g %g %d %d %d %d\n",
-        prefix, x, y, z, level, cell.neighbors,
-        cell.pid, cell.flags & leaf);
-
-
-
-
-
-
-  }end_foreach_cell();}
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "depth", prefix);
-  fprintf (fp, "depth: %d %d\n", pid(), depth());
-  fprintf (fp, "======= mpi_level.snd ======\n");
-  RcvPid * snd = mpi->mpi_level.snd;
-  for (int i = 0; i < snd->npid; i++)
-    fprintf (fp, "%d %d %d\n", pid(), snd->rcv[i].pid, snd->rcv[i].maxdepth);
-  fprintf (fp, "======= mpi_level.rcv ======\n");
-  snd = mpi->mpi_level.rcv;
-  for (int i = 0; i < snd->npid; i++)
-    fprintf (fp, "%d %d %d\n", pid(), snd->rcv[i].pid, snd->rcv[i].maxdepth);
-  if (!fp1)
-    fclose (fp);
-
-  fp = fopen_prefix (fp1, "refined", prefix);
-  {foreach_cache (((Tree *)grid)->refined)
-    fprintf (fp, "%s%g %g %g %d\n", prefix, x, y, z, level);end_foreach_cache();}
-  if (!fp1)
-    fclose (fp);
-}
-
-static void snd_rcv_free (SndRcv * p)
-{
-  char name[strlen(p->rcv->name) + 1];
-  strcpy (name, p->rcv->name);
-  rcv_pid_destroy (p->rcv);
-  p->rcv = rcv_pid_new (name);
-  strcpy (name, p->snd->name);
-  rcv_pid_destroy (p->snd);
-  p->snd = rcv_pid_new (name);
-}
-
-static bool is_root (Point point)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  if ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0))
-    {foreach_child()
-      if (is_local(cell))
- return true;end_foreach_child()}
-  return false;
-}
-
-
-static bool is_local_prolongation (Point point, Point p)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-  struct { int x, y; } dp = {p.i - point.i, p.j - point.j};
-
-
-
+  struct { int x, y, z; } dir = {0,1,2};
    {
-    if (dp.x == 0 && ((!is_leaf (neighbor(-1,0,0)) && neighbor(-1,0,0).neighbors && neighbor(-1,0,0).pid >= 0) || (!is_leaf (neighbor(1,0,0)) && neighbor(1,0,0).neighbors && neighbor(1,0,0).pid >= 0)))
-      return true;
-    if ((!is_leaf (neighbor(dp.x,0,0)) && neighbor(dp.x,0,0).neighbors && neighbor(dp.x,0,0).pid >= 0))
-      return true;
+    int l, r;
+    MPI_Cart_shift (m->cartcomm, dir.x, 1, &l, &r);
+    if (l != MPI_PROC_NULL)
+      periodic_boundary (left);
+    if (r != MPI_PROC_NULL)
+      periodic_boundary (right);
   } 
-#line 713
+#line 102
 {
-    if (dp.y == 0 && ((!is_leaf (neighbor(0,-1,0)) && neighbor(0,-1,0).neighbors && neighbor(0,-1,0).pid >= 0) || (!is_leaf (neighbor(0,1,0)) && neighbor(0,1,0).neighbors && neighbor(0,1,0).pid >= 0)))
-      return true;
-    if ((!is_leaf (neighbor(0,dp.y,0)) && neighbor(0,dp.y,0).neighbors && neighbor(0,dp.y,0).pid >= 0))
-      return true;
-  }
-  return false;
-}
-
-
-
-static void append_pid (Array * pids, int pid)
-{
-  for (int i = 0, * p = (int *) pids->p; i < pids->len/sizeof(int); i++, p++)
-    if (*p == pid)
-      return;
-  array_append (pids, &pid, sizeof(int));
-}
-
-static int locals_pids (Point point, Array * pids)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  if (is_leaf(cell)) {
-    if (is_local(cell)) {
-      Point p = point;
-      {foreach_neighbor(1) {
- if ((cell.pid >= 0 && cell.pid != pid()) &&
-     ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0) || is_local_prolongation (point, p)))
-   append_pid (pids, cell.pid);
- if ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0))
-   {foreach_child()
-     if ((cell.pid >= 0 && cell.pid != pid()))
-       append_pid (pids, cell.pid);end_foreach_child()}
-      }end_foreach_neighbor()}
-    }
-  }
-  else
-    {foreach_neighbor(1) {
-      if ((cell.pid >= 0 && cell.pid != pid()))
- append_pid (pids, cell.pid);
-      if ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0))
- {foreach_child()
-   if ((cell.pid >= 0 && cell.pid != pid()))
-     append_pid (pids, cell.pid);end_foreach_child()}
-    }end_foreach_neighbor()}
-  return pids->len/sizeof(int);
-}
-
-static int root_pids (Point point, Array * pids)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  {foreach_child()
-    if ((cell.pid >= 0 && cell.pid != pid()))
-      append_pid (pids, cell.pid);end_foreach_child()}
-  return pids->len/sizeof(int);
-}
-
-
-
-
-
-
-
-static void rcv_pid_row (RcvPid * m, int l, int * row)
-{
-  for (int i = 0; i < npe(); i++)
-    row[i] = 0;
-  for (int i = 0; i < m->npid; i++) {
-    Rcv * rcv = &m->rcv[i];
-    if (l <= rcv->depth && rcv->halo[l].n > 0)
-      row[rcv->pid] = rcv->halo[l].n;
-  }
-}
-
-void check_snd_rcv_matrix (SndRcv * sndrcv, const char * name)
-{
-  int maxlevel = depth();
-  mpi_all_reduce (maxlevel, MPI_INT, MPI_MAX);
-  int * row = ((int *) pmalloc ((npe())*sizeof(int),__func__,__FILE__,__LINE__));
-  for (int l = 0; l <= maxlevel; l++) {
-    int status = 0;
-    if (pid() == 0) {
-
-
-      int ** send = matrix_new (npe(), npe(), sizeof(int));
-      int ** receive = matrix_new (npe(), npe(), sizeof(int));
-      rcv_pid_row (sndrcv->snd, l, row);
-      MPI_Gather (row, npe(), MPI_INT, &send[0][0], npe(), MPI_INT, 0,
-    MPI_COMM_WORLD);
-      rcv_pid_row (sndrcv->rcv, l, row);
-      MPI_Gather (row, npe(), MPI_INT, &receive[0][0], npe(), MPI_INT, 0,
-    MPI_COMM_WORLD);
-
-      int * astatus = ((int *) pmalloc ((npe())*sizeof(int),__func__,__FILE__,__LINE__));
-      for (int i = 0; i < npe(); i++)
- astatus[i] = 0;
-      for (int i = 0; i < npe(); i++)
- for (int j = 0; j < npe(); j++)
-   if (send[i][j] != receive[j][i]) {
-     fprintf (ferr, "%s: %d sends    %d to   %d at level %d\n",
-       name, i, send[i][j], j, l);
-     fprintf (ferr, "%s: %d receives %d from %d at level %d\n",
-       name, j, receive[j][i], i, l);
-     fflush (ferr);
-     for (int k = i - 2; k <= i + 2; k++)
-       if (k >= 0 && k < npe())
-  astatus[k] = 1;
-     for (int k = j - 2; k <= j + 2; k++)
-       if (k >= 0 && k < npe())
-  astatus[k] = 1;
-   }
-      MPI_Scatter (astatus, 1, MPI_INT, &status, 1, MPI_INT, 0, MPI_COMM_WORLD);
-      pfree (astatus,__func__,__FILE__,__LINE__);
-
-      matrix_free (send);
-      matrix_free (receive);
-    }
-    else {
-      rcv_pid_row (sndrcv->snd, l, row);
-      MPI_Gather (row, npe(), MPI_INT, NULL, npe(), MPI_INT, 0, MPI_COMM_WORLD);
-      rcv_pid_row (sndrcv->rcv, l, row);
-      MPI_Gather (row, npe(), MPI_INT, NULL, npe(), MPI_INT, 0, MPI_COMM_WORLD);
-      MPI_Scatter (NULL, 1, MPI_INT, &status, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    }
-    if (status) {
-      fprintf (ferr,
-        "check_snd_rcv_matrix \"%s\" failed\n"
-        "Calling debug_mpi(NULL)...\n"
-        "Aborting...\n",
-        name);
-      fflush (ferr);
-      debug_mpi (NULL);
-      MPI_Abort (MPI_COMM_WORLD, -3);
-    }
-  }
-  pfree (row,__func__,__FILE__,__LINE__);
-}
-
-static bool has_local_child (Point point)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  {foreach_child()
-    if (is_local(cell))
-      return true;end_foreach_child()}
-  return false;
-}
-
-     
-void mpi_boundary_update_buffers()
-{tracing("mpi_boundary_update_buffers","/home/mc462/basilisk/src/grid/tree-mpi.h",858);
-  if (npe() == 1)
-    {end_tracing("mpi_boundary_update_buffers","/home/mc462/basilisk/src/grid/tree-mpi.h",861);return;}
-
-  prof_start ("mpi_boundary_update_buffers");
-
-  MpiBoundary * m = (MpiBoundary *) mpi_boundary;
-  SndRcv * mpi_level = &m->mpi_level;
-  SndRcv * mpi_level_root = &m->mpi_level_root;
-  SndRcv * restriction = &m->restriction;
-
-  snd_rcv_free (mpi_level);
-  snd_rcv_free (mpi_level_root);
-  snd_rcv_free (restriction);
-
-  static const unsigned short used = 1 << user;
-  {foreach_cell() {
-    if (is_active(cell) && !is_border(cell))
-
-
-
-      continue;
-
-    if (cell.neighbors) {
-
-      Array pids = {NULL, 0, 0};
-      int n = locals_pids (point, &pids);
-      if (n) {
- {foreach_child()
-   if (is_local(cell))
-     for (int i = 0, * p = (int *) pids.p; i < n; i++, p++)
-       rcv_pid_append (mpi_level->snd, *p, point);end_foreach_child()}
- pfree (pids.p,__func__,__FILE__,__LINE__);
-      }
-
-      bool locals = false;
-      if (is_leaf(cell)) {
- if ((cell.pid >= 0 && cell.pid != pid())) {
-   Point p = point;
-   {foreach_neighbor(1)
-     if ((is_local(cell) &&
-   ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0) || is_local_prolongation (point, p))) ||
-  is_root(point)) {
-       locals = true; foreach_neighbor_break();
-     }end_foreach_neighbor()}
- }
-      }
-      else
- {foreach_neighbor(1)
-   if (is_local(cell) || is_root(point)) {
-     locals = true; foreach_neighbor_break();
-   }end_foreach_neighbor()}
-      if (locals)
- {foreach_child()
-   if ((cell.pid >= 0 && cell.pid != pid()))
-            rcv_pid_append (mpi_level->rcv, cell.pid, point),
-       cell.flags |= used;end_foreach_child()}
-
-
-      if (!is_leaf(cell)) {
-
- if (is_local(cell)) {
-   Array pids = {NULL, 0, 0};
-
-   int n = root_pids (point, &pids);
-   if (n) {
-     {foreach_neighbor()
-       for (int i = 0, * p = (int *) pids.p; i < n; i++, p++)
-  if (cell.pid >= 0 && cell.pid != *p)
-    rcv_pid_append (mpi_level_root->snd, *p, point);end_foreach_neighbor()}
-
-     for (int i = 0, * p = (int *) pids.p; i < n; i++, p++)
-       rcv_pid_append (restriction->snd, *p, point);
-     pfree (pids.p,__func__,__FILE__,__LINE__);
-   }
- }
-
- else if ((cell.pid >= 0 && cell.pid != pid())) {
-   bool root = false;
-   {foreach_child()
-     if (is_local(cell)) {
-       root = true; foreach_child_break();
-     }end_foreach_child()}
-   if (root) {
-     int pid = cell.pid;
-     {foreach_neighbor()
-       if ((cell.pid >= 0 && cell.pid != pid()))
-  rcv_pid_append (mpi_level_root->rcv, pid, point),
-    cell.flags |= used;end_foreach_neighbor()}
-
-     rcv_pid_append (restriction->rcv, pid, point);
-   }
- }
-      }
-    }
-
-
-    if (level > 0) {
-      if (is_local(cell)) {
-
- Array pids = {NULL, 0, 0};
- if ((aparent(0,0,0).pid >= 0 && aparent(0,0,0).pid != pid()))
-   append_pid (&pids, aparent(0,0,0).pid);
- int n = root_pids (parent, &pids);
- if (n) {
-   for (int i = 0, * p = (int *) pids.p; i < n; i++, p++)
-     rcv_pid_append (restriction->snd, *p, point);
-   pfree (pids.p,__func__,__FILE__,__LINE__);
- }
-      }
-      else if ((cell.pid >= 0 && cell.pid != pid())) {
-
- if (is_local(aparent(0,0,0)) || has_local_child (parent))
-   rcv_pid_append (restriction->rcv, cell.pid, point);
-      }
-    }
-  }end_foreach_cell();}
-
-
-
-
-
-  static const unsigned short keep = 1 << (user + 1);
-  for (int l = depth(); l >= 0; l--)
-    {foreach_cell()
-      if (level == l) {
- if (level > 0 && (cell.pid < 0 || is_local(cell) || (cell.flags & used)))
-   aparent(0,0,0).flags |= keep;
- if ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0) && !(cell.flags & keep))
-   coarsen_cell (point, NULL);
- cell.flags &= ~(used|keep);
- continue;
-      }end_foreach_cell();}
-
-
-  m->send->len = m->receive->len = 0;
-  rcv_pid_append_pids (mpi_level->snd, m->send);
-  rcv_pid_append_pids (mpi_level_root->snd, m->send);
-  rcv_pid_append_pids (mpi_level->rcv, m->receive);
-  rcv_pid_append_pids (mpi_level_root->rcv, m->receive);
-
-  prof_stop();
-#line 1015 "/home/mc462/basilisk/src/grid/tree-mpi.h"
-end_tracing("mpi_boundary_update_buffers","/home/mc462/basilisk/src/grid/tree-mpi.h",1015);}
-
-     
-void mpi_boundary_refine (scalar * list)
-{tracing("mpi_boundary_refine","/home/mc462/basilisk/src/grid/tree-mpi.h",1018);
-  prof_start ("mpi_boundary_refine");
-
-  MpiBoundary * mpi = (MpiBoundary *) mpi_boundary;
-
-
-  Array * snd = mpi->send;
-  MPI_Request r[2*snd->len/sizeof(int)];
-  int nr = 0;
-  for (int i = 0, * dest = snd->p; i < snd->len/sizeof(int); i++,dest++) {
-    int len = ((Tree *)grid)->refined.n;
-    MPI_Isend (&((Tree *)grid)->refined.n, 1, MPI_INT, *dest,
-        (128), MPI_COMM_WORLD, &r[nr++]);
-    if (len > 0)
-      MPI_Isend (((Tree *)grid)->refined.p, sizeof(Index)/sizeof(int)*len,
-   MPI_INT, *dest, (128), MPI_COMM_WORLD, &r[nr++]);
+    int l, r;
+    MPI_Cart_shift (m->cartcomm, dir.y, 1, &l, &r);
+    if (l != MPI_PROC_NULL)
+      periodic_boundary (bottom);
+    if (r != MPI_PROC_NULL)
+      periodic_boundary (top);
   }
 
 
-
-  Array * rcv = mpi->receive;
-  Cache rerefined = {NULL, 0, 0};
-  for (int i = 0, * source = rcv->p; i < rcv->len/sizeof(int); i++,source++) {
-    int len;
-    mpi_recv_check (&len, 1, MPI_INT, *source, (128),
-      MPI_COMM_WORLD, MPI_STATUS_IGNORE,
-      "mpi_boundary_refine (len)");
-    if (len > 0) {
-      Index p[len];
-      mpi_recv_check (p, sizeof(Index)/sizeof(int)*len,
-        MPI_INT, *source, (128),
-        MPI_COMM_WORLD, MPI_STATUS_IGNORE,
-        "mpi_boundary_refine (p)");
-      Cache refined = {p, len, len};
-      {foreach_cache (refined)
- if (level <= depth() && allocated(0,0,0)) {
-   if (is_leaf(cell)) {
-     bool neighbors = false;
-     {foreach_neighbor()
-       if (allocated(0,0,0) && (is_active(cell) || is_local(aparent(0,0,0)))) {
-  neighbors = true; foreach_neighbor_break();
-       }end_foreach_neighbor()}
-
-     if (neighbors)
-       refine_cell (point, list, 0, &rerefined);
-   }
- }end_foreach_cache();}
-    }
-  }
+  N /= mpi_dims[0];
+  int r = 0;
+  while (N > 1)
+    N /= 2, r++;
+  grid->depth = grid->maxdepth = r;
+  N = mpi_dims[0]*(1 << r);
+  grid->n = 1 << 2*depth();
+  grid->tn = npe()*grid->n;
 
 
-  if (nr)
-    MPI_Waitall (nr, r, MPI_STATUSES_IGNORE);
+  Boundary * b = (Boundary *) m;
+  b->level = mpi_boundary_level;
+  b->destroy = mpi_boundary_destroy;
+  add_boundary (b);
 
-
-  pfree (((Tree *)grid)->refined.p,__func__,__FILE__,__LINE__);
-  ((Tree *)grid)->refined = rerefined;
-
-  prof_stop();
-
-
-
-  mpi_all_reduce (rerefined.n, MPI_INT, MPI_SUM);
-  if (rerefined.n)
-    mpi_boundary_refine (list);
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    _attribute[s.i].dirty = true;}}
-end_tracing("mpi_boundary_refine","/home/mc462/basilisk/src/grid/tree-mpi.h",1086);}
-
-static void check_depth()
-{
-#line 1121 "/home/mc462/basilisk/src/grid/tree-mpi.h"
+  return b;
 }
 
-typedef struct {
-  int refined, leaf;
-} Remote;
-
-
-
-     
-void mpi_boundary_coarsen (int l, int too_fine)
-{tracing("mpi_boundary_coarsen","/home/mc462/basilisk/src/grid/tree-mpi.h",1130);
-  if (npe() == 1)
-    {end_tracing("mpi_boundary_coarsen","/home/mc462/basilisk/src/grid/tree-mpi.h",1133);return;}
-
-  check_depth();
-
-  if (!(sizeof(Remote) == sizeof(double))) qassert ("/home/mc462/basilisk/src/grid/tree-mpi.h", 1137, "sizeof(Remote) == sizeof(double)");
-
-  scalar  remote=new_scalar("remote");
-  {foreach_cell() {
-    if (level == l) {
-      if (is_local(cell)) {
- ((Remote *)&val(remote,0,0,0))->refined = (!is_leaf (cell) && cell.neighbors && cell.pid >= 0);
- ((Remote *)&val(remote,0,0,0))->leaf = is_leaf(cell);
-      }
-      else {
- ((Remote *)&val(remote,0,0,0))->refined = true;
- ((Remote *)&val(remote,0,0,0))->leaf = false;
-      }
-      continue;
-    }
-    if (is_leaf(cell))
-      continue;
-  }end_foreach_cell();}
-  mpi_boundary_level (mpi_boundary,((scalar[]) {remote,{-1}}), l);
-
-  {foreach_cell() {
-    if (level == l) {
-      if (!is_local(cell)) {
- if ((!is_leaf (cell) && cell.neighbors && cell.pid >= 0) && !((Remote *)&val(remote,0,0,0))->refined)
-   coarsen_cell_recursive (point, NULL);
- else if (is_leaf(cell) && cell.neighbors && ((Remote *)&val(remote,0,0,0))->leaf) {
-   int pid = cell.pid;
-   {foreach_child()
-     cell.pid = pid;end_foreach_child()}
- }
-      }
-      continue;
-    }
-    if (is_leaf(cell))
-      continue;
-  }end_foreach_cell();}
-
-  check_depth();
-
-  if (l > 0) {
-    {foreach_cell() {
-      if (level == l) {
- val(remote,0,0,0) = is_local(cell) ? cell.neighbors : 0;
- continue;
-      }
-      if (is_leaf(cell))
- continue;
-    }end_foreach_cell();}
-    mpi_boundary_level (mpi_boundary,((scalar[]) {remote,{-1}}), l);
-    {foreach_cell() {
-      if (level == l)
- if (!is_local(cell) && is_local(aparent(0,0,0)) && val(remote,0,0,0)) {
-   aparent(0,0,0).flags &= ~too_fine;
-   continue;
- }
-      if (is_leaf(cell))
- continue;
-    }end_foreach_cell();}
-  }delete((scalar*)((scalar[]){remote,{-1}}));
-end_tracing("mpi_boundary_coarsen","/home/mc462/basilisk/src/grid/tree-mpi.h",1196);}
-
-static void flag_border_cells()
-{
-  {foreach_cell() {
-    if (is_active(cell)) {
-      short flags = cell.flags & ~border;
-      {foreach_neighbor() {
- if (!is_local(cell) || (level > 0 && !is_local(aparent(0,0,0)))) {
-   flags |= border; foreach_neighbor_break();
- }
-
- if (is_refined_check())
-   {foreach_child()
-     if (!is_local(cell)) {
-       flags |= border; foreach_child_break();
-     }end_foreach_child()}
- if (flags & border)
-   foreach_neighbor_break();
-      }end_foreach_neighbor()}
-      cell.flags = flags;
-    }
-    else {
-      cell.flags &= ~border;
-
-    }
-    if (is_leaf(cell)) {
-      if (cell.neighbors) {
- {foreach_child()
-   cell.flags &= ~border;end_foreach_child()}
- if (is_border(cell)) {
-   bool remote = false;
-   {foreach_neighbor (2/2)
-     if (!is_local(cell)) {
-       remote = true; foreach_neighbor_break();
-     }end_foreach_neighbor()}
-   if (remote)
-     {foreach_child()
-       cell.flags |= border;end_foreach_child()}
- }
-      }
-      continue;
-    }
-  }end_foreach_cell();}
-}
-
-static int balanced_pid (long index, long nt, int nproc)
-{
-  long ne = max(1, nt/nproc), nr = nt % nproc;
-  int pid = index < nr*(ne + 1) ?
-    index/(ne + 1) :
-    nr + (index - nr*(ne + 1))/ne;
-  return min(nproc - 1, pid);
-}
-
-
-     
-void mpi_partitioning()
-{tracing("mpi_partitioning","/home/mc462/basilisk/src/grid/tree-mpi.h",1253);
-  prof_start ("mpi_partitioning");
-
-  long nt = 0;
-  
-#if _OPENMP
-  #undef OMP
-  #define OMP(x)
-#endif
-{
-#line 1258
-foreach ()
-    nt++;end_foreach();}
-#if _OPENMP
-  #undef OMP
-  #define OMP(x) _Pragma(#x)
-#endif
-
-
-
-  
-#line 1262
-long i = 0;
-  ((Tree *)grid)->dirty = true;
-  {foreach_cell_post (is_active (cell))
-    if (is_active (cell)) {
-      if (is_leaf (cell)) {
- cell.pid = balanced_pid (i++, nt, npe());
- if (cell.neighbors > 0) {
-   int pid = cell.pid;
-   {foreach_child()
-     cell.pid = pid;end_foreach_child()}
- }
- if (!is_local(cell))
-   cell.flags &= ~active;
-      }
-      else {
- cell.pid = child(0,0,0).pid;
- bool inactive = true;
- {foreach_child()
-   if (is_active(cell)) {
-     inactive = false; foreach_child_break();
-   }end_foreach_child()}
- if (inactive)
-   cell.flags &= ~active;
-      }
-    }end_foreach_cell_post();}
-
-  flag_border_cells();
-
-  prof_stop();
-
-  mpi_boundary_update_buffers();
-end_tracing("mpi_partitioning","/home/mc462/basilisk/src/grid/tree-mpi.h",1293);}
-
-void restore_mpi (FILE * fp, scalar * list1)
-{
-  long index = 0, nt = 0, start = ftell (fp);
-  scalar  size=new_scalar("size"), * list = list_concat (((scalar[]){size,{-1}}), list1);;
-  long offset = sizeof(double)*list_len(list);
-
-
-  static const unsigned short set = 1 << user;
-  scalar * listm = is_constant(cm) ? NULL : (scalar *)((vector[]){fm,{{-1},{-1}}});
-  {foreach_cell()
-    if (balanced_pid (index, nt, npe()) <= pid()) {
-      unsigned flags;
-      if (fread (&flags, sizeof(unsigned), 1, fp) != 1) {
- fprintf (ferr, "restore(): error: expecting 'flags'\n");
- exit (1);
-      }
-      {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
- double val;
- if (fread (&val, sizeof(double), 1, fp) != 1) {
-   fprintf (ferr, "restore(): error: expecting scalar\n");
-   exit (1);
- }
- if (s.i != INT_MAX)
-   val(s,0,0,0) = val;
-      }}}
-      if (level == 0)
- nt = val(size,0,0,0);
-      cell.pid = balanced_pid (index, nt, npe());
-      cell.flags |= set;
-      if (!(flags & leaf) && is_leaf(cell)) {
- if (balanced_pid (index + val(size,0,0,0) - 1, nt, npe()) < pid()) {
-   fseek (fp, (sizeof(unsigned) + offset)*(val(size,0,0,0) - 1), SEEK_CUR);
-   index += val(size,0,0,0);
-   continue;
- }
- refine_cell (point, listm, 0, NULL);
-      }
-      index++;
-      if (is_leaf(cell))
- continue;
-    }end_foreach_cell();}
-
-
-  fseek (fp, start, SEEK_SET);
-  index = 0;
-  {foreach_cell() {
-    unsigned flags;
-    if (fread (&flags, sizeof(unsigned), 1, fp) != 1) {
-      fprintf (ferr, "restore(): error: expecting 'flags'\n");
-      exit (1);
-    }
-    if (cell.flags & set)
-      fseek (fp, offset, SEEK_CUR);
-    else {
-      {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
- double val;
- if (fread (&val, sizeof(double), 1, fp) != 1) {
-   fprintf (ferr, "restore(): error: expecting a scalar\n");
-   exit (1);
- }
- if (s.i != INT_MAX)
-   val(s,0,0,0) = val;
-      }}}
-      cell.pid = balanced_pid (index, nt, npe());
-      if (is_leaf(cell) && cell.neighbors) {
- int pid = cell.pid;
- {foreach_child()
-   cell.pid = pid;end_foreach_child()}
-      }
-    }
-    if (!(flags & leaf) && is_leaf(cell)) {
-      bool locals = false;
-      {foreach_neighbor(1)
- if ((cell.flags & set) && (is_local(cell) || is_root(point))) {
-   locals = true; foreach_neighbor_break();
- }end_foreach_neighbor()}
-      if (locals)
- refine_cell (point, listm, 0, NULL);
-      else {
- fseek (fp, (sizeof(unsigned) + offset)*(val(size,0,0,0) - 1), SEEK_CUR);
- index += val(size,0,0,0);
- continue;
-      }
-    }
-    index++;
-    if (is_leaf(cell))
-      continue;
-  }end_foreach_cell();}
-
-
-  {foreach_cell_post (is_active (cell)) {
-    cell.flags &= ~set;
-    if (is_active (cell)) {
-      if (is_leaf (cell)) {
- if (cell.neighbors > 0) {
-   int pid = cell.pid;
-   {foreach_child()
-     cell.pid = pid;end_foreach_child()}
- }
- if (!is_local(cell))
-   cell.flags &= ~active;
-      }
-      else if (!is_local(cell)) {
- bool inactive = true;
- {foreach_child()
-   if (is_active(cell)) {
-     inactive = false; foreach_child_break();
-   }end_foreach_child()}
- if (inactive)
-   cell.flags &= ~active;
-      }
-    }
-  }end_foreach_cell_post();}
-
-  flag_border_cells();
-
-  mpi_boundary_update (list);
-  pfree (list,__func__,__FILE__,__LINE__);delete((scalar*)((scalar[]){size,{-1}}));
-}
-#line 1435 "/home/mc462/basilisk/src/grid/tree-mpi.h"
      
 double z_indexing (scalar index, bool leaves)
-{tracing("z_indexing","/home/mc462/basilisk/src/grid/tree-mpi.h",1436);
-
-
-
-  scalar  size=new_scalar("size");
-  subtree_size (size, leaves);
-
-
-
-
-
-
-  double maxi = -1.;
-  if (pid() == 0)
-    {foreach_level(0)
-      maxi = val(size,0,0,0) - 1.;end_foreach_level();}
-
-
-
-
-  {foreach_level(0)
-    val(index,0,0,0) = 0;end_foreach_level();}
-  for (int l = 0; l < depth(); l++) {
-    { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->restriction) _b->restriction (_b,((scalar[]) {index,{-1}}), l); };
-    {foreach_cell() {
-      if (level == l) {
- if (is_leaf(cell)) {
-   if (is_local(cell) && cell.neighbors) {
-     int i = val(index,0,0,0);
-     {foreach_child()
-       val(index,0,0,0) = i;end_foreach_child()}
-   }
- }
- else {
-   bool loc = is_local(cell);
-   if (!loc)
-     {foreach_child()
-       if (is_local(cell)) {
-  loc = true; foreach_child_break();
-       }end_foreach_child()}
-   if (loc) {
-     int i = val(index,0,0,0) + !leaves;
-     {foreach_child() {
-       val(index,0,0,0) = i;
-       i += val(size,0,0,0);
-     }end_foreach_child()}
-   }
- }
- continue;
-      }
-      if (is_leaf(cell))
- continue;
-    }end_foreach_cell();}
-  }
-  { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->restriction) _b->restriction (_b,((scalar[]) {index,{-1}}), depth()); };
-
-  {delete((scalar*)((scalar[]){size,{-1}}));{end_tracing("z_indexing","/home/mc462/basilisk/src/grid/tree-mpi.h",1493);return maxi;}}delete((scalar*)((scalar[]){size,{-1}}));
-end_tracing("z_indexing","/home/mc462/basilisk/src/grid/tree-mpi.h",1494);}
-#line 1685 "/home/mc462/basilisk/src/grid/tree.h"
-#line 1 "grid/balance.h"
-#line 1 "/home/mc462/basilisk/src/grid/balance.h"
-
-
-typedef struct {
-  short leaf, prolongation;
-  int pid;
-} NewPid;
-
-
-
-#if TRASH
-# define is_newpid() (!isnan(val(newpid,0,0,0)) && ((NewPid *)&val(newpid,0,0,0))->pid > 0)
-#else
-# define is_newpid() (((NewPid *)&val(newpid,0,0,0))->pid > 0)
-#endif
-
-Array * linear_tree (size_t size, scalar newpid)
-{
-  const unsigned short sent = 1 << user, next = 1 << (user + 1);
-  Array * a = array_new();
-
-  {foreach_cell_post_all (true)
-    if (level > 0 && (cell.flags & (sent|next)))
-      aparent(0,0,0).flags |= next;end_foreach_cell_post_all();}
-
-  bool empty = true;
-  {foreach_cell_all() {
-    if (cell.flags & sent) {
-      array_append (a, &cell, size);
-      cell.flags &= ~sent;
-      empty = false;
-    }
-    else {
-      if (cell.pid >= 0 && ((NewPid *)&val(newpid,0,0,0))->leaf)
- if (!(is_leaf(cell))) qassert ("/home/mc462/basilisk/src/grid/balance.h", 34, "is_leaf(cell)");
-      if (is_refined_check()) {
-
-
- bool prolo = false;
- {foreach_child()
-   if (((NewPid *)&val(newpid,0,0,0))->prolongation)
-     prolo = true;end_foreach_child()}
- if (prolo) {
-
-   cell.flags |= leaf;
-   array_append (a, &cell, sizeof(Cell));
-   cell.flags &= ~leaf;
- }
- else
-   array_append (a, &cell, sizeof(Cell));
-      }
-      else
- array_append (a, &cell, sizeof(Cell));
-    }
-    if (cell.flags & next)
-      cell.flags &= ~next;
-    else
-      continue;
-  }end_foreach_cell_all();}
-
-  if (empty)
-    a->len = 0;
-  return a;
-}
-
-#define foreach_tree(t, size, list)\
-{\
-  const unsigned short _sent = 1 << user, _next = 1 << (user + 1);\
-  scalar * _list = list;\
-  char * _i = (char *) (t)->p;\
-  foreach_cell_all() {\
-    Cell * c = (Cell *) _i;\
-    if (c->flags & _sent) {\
-      _i += size;\
-
-#line 74
-
-
-#define end_foreach_tree()\
-    }\
-    else\
-      _i += sizeof(Cell);\
-    if (c->flags & _next) {\
-      if (!(c->neighbors)) qassert ("/home/mc462/basilisk/src/grid/balance.h", 81, "c->neighbors");\
-      if (!(c->flags & leaf) && is_leaf(cell) &&\
-   (!is_newpid() || !((NewPid *)&val(newpid,0,0,0))->leaf))\
-\
- refine_cell (point, _list, 0, NULL);\
-      else if (!cell.neighbors)\
-\
- alloc_children (point);\
-    }\
-    else\
-      continue;\
-  } end_foreach_cell_all();\
-}\
-
-#line 94
-
-
-Array * neighborhood (scalar newpid, int nextpid, FILE * fp)
-{
-  const unsigned short sent = 1 << user;
+{tracing("z_indexing","/home/mc462/basilisk/src/grid/multigrid-mpi.h",131);
+  long i;
+  if (leaves)
+    i = pid()*(1 << 2*depth());
+  else
+    i = pid()*((1 << 2*(depth() + 1)) - 1)/((1 << 2) - 1);
   {foreach_cell() {
-
-    bool root = false;
-    if ((!is_local(cell) || ((NewPid *)&val(newpid,0,0,0))->pid - 1 != nextpid) && (!is_leaf (cell) && cell.neighbors && cell.pid >= 0)) {
-      {foreach_child()
- if (is_local(cell) && ((NewPid *)&val(newpid,0,0,0))->pid - 1 == nextpid) {
-   root = true; foreach_child_break();
- }end_foreach_child()}
-      if (root && cell.pid != nextpid) {
- {foreach_neighbor()
-   if (cell.pid != nextpid && is_newpid()) {
-     if (fp)
-       fprintf (fp, "%g %g %g %d %d root\n",
-         x, y, z, ((NewPid *)&val(newpid,0,0,0))->pid - 1, cell.pid);
-     cell.flags |= sent;
-   }end_foreach_neighbor()}
-      }
-    }
-
-    if ((is_local(cell) && ((NewPid *)&val(newpid,0,0,0))->pid - 1 == nextpid) || root) {
-      {foreach_neighbor(1)
- if (cell.neighbors && cell.pid != nextpid)
-   {foreach_child()
-     if (cell.pid != nextpid && is_newpid()) {
-       if (fp)
-  fprintf (fp, "%g %g %g %d %d nextpid\n",
-    x, y, z, ((NewPid *)&val(newpid,0,0,0))->pid - 1, cell.pid);
-       cell.flags |= sent;
-     }end_foreach_child()}end_foreach_neighbor()}
-    }
+    if (!leaves || is_leaf(cell))
+      val(index,0,0,0) = i++;
     if (is_leaf(cell))
       continue;
   }end_foreach_cell();}
-
-  return linear_tree (sizeof(Cell) + datasize, newpid);
-}
-
-static void send_tree (Array * a, int to, MPI_Request * r)
-{
-  MPI_Isend (&a->len, 1, MPI_LONG, to, (256), MPI_COMM_WORLD, &r[0]);
-  if (a->len > 0) {
-    MPI_Isend (a->p, a->len, MPI_BYTE, to, (256), MPI_COMM_WORLD, &r[1]);
-    ((Tree *)grid)->dirty = true;
-  }
-}
-
-static void receive_tree (int from, scalar newpid, FILE * fp)
-{
-  Array a;
-  mpi_recv_check (&a.len, 1, MPI_LONG, from, (256),
-    MPI_COMM_WORLD, MPI_STATUS_IGNORE, "receive_tree (len)");
-  if (a.len > 0) {
-    a.p = pmalloc (a.len,__func__,__FILE__,__LINE__);
-    if (fp)
-      fprintf (fp, "receiving %ld from %d\n", a.len, from);
-    mpi_recv_check (a.p, a.len, MPI_BYTE, from, (256),
-      MPI_COMM_WORLD, MPI_STATUS_IGNORE, "receive_tree (p)");
-
-    {foreach_tree (&a, sizeof(Cell) + datasize, NULL) {
-      memcpy (((char *)&cell) + sizeof(Cell), ((char *)c) + sizeof(Cell),
-       datasize);
-      if (!(((NewPid *)&val(newpid,0,0,0))->pid > 0)) qassert ("/home/mc462/basilisk/src/grid/balance.h", 160, "NEWPID()->pid > 0");
-      if (fp)
- fprintf (fp, "%g %g %g %d %d %d %d %d %d recv\n",
-   x, y, z, ((NewPid *)&val(newpid,0,0,0))->pid - 1, cell.pid,
-   c->flags & leaf,
-   cell.flags & leaf, from, ((NewPid *)&val(newpid,0,0,0))->leaf);
-    }end_foreach_tree();}
-    pfree (a.p,__func__,__FILE__,__LINE__);
-    ((Tree *)grid)->dirty = true;
-  }
-}
-
-static void wait_tree (Array * a, MPI_Request * r)
-{
-  MPI_Wait (&r[0], MPI_STATUS_IGNORE);
-  if (a->len > 0)
-    MPI_Wait (&r[1], MPI_STATUS_IGNORE);
-}
-
-static void check_flags()
-{
+  boundary_internal ((scalar *)((scalar[]){index,{-1}}), "/home/mc462/basilisk/src/grid/multigrid-mpi.h", 144);
+  { double _ret= pid() == 0 ? i*npe() - 1 : -1;end_tracing("z_indexing","/home/mc462/basilisk/src/grid/multigrid-mpi.h",145);return _ret;}
+end_tracing("z_indexing","/home/mc462/basilisk/src/grid/multigrid-mpi.h",146);}
+#line 915 "/home/mc462/basilisk/src/grid/multigrid.h"
+#line 21 "drop.c"
 
 
 
 
-
-
-
-}
-
-struct {
-  int min;
-  bool leaves;
-
-  int npe;
-} mpi = {
-  1,
-  true
-};
-
-     
-bool balance()
-{tracing("balance","/home/mc462/basilisk/src/grid/balance.h",201);
-  if (npe() == 1)
-    {end_tracing("balance","/home/mc462/basilisk/src/grid/balance.h",204);return false;}
-
-  if (!(sizeof(NewPid) == sizeof(double))) qassert ("/home/mc462/basilisk/src/grid/balance.h", 206, "sizeof(NewPid) == sizeof(double)");
-
-  check_flags();
-
-  long nl = 0, nt = 0;
-  {foreach_cell() {
-    if (is_local(cell)) {
-      nt++;
-      if (is_leaf(cell))
- nl++;
-    }
-    if (is_leaf(cell))
-      continue;
-  }end_foreach_cell();}
-
-  grid->n = grid->tn = nl;
-  grid->maxdepth = depth();
-  long nmin = nl, nmax = nl;
-
-  mpi_all_reduce (nmax, MPI_LONG, MPI_MAX);
-  mpi_all_reduce (nmin, MPI_LONG, MPI_MIN);
-  mpi_all_reduce (grid->tn, MPI_LONG, MPI_SUM);
-  mpi_all_reduce (grid->maxdepth, MPI_INT, MPI_MAX);
-  if (mpi.leaves)
-    nt = grid->tn;
-  else
-    mpi_all_reduce (nt, MPI_LONG, MPI_SUM);
-
-  long ne = max(1, nt/npe());
-
-  if (ne < mpi.min) {
-    mpi.npe = max(1, nt/mpi.min);
-    ne = max(1, nt/mpi.npe);
-  }
-  else
-    mpi.npe = npe();
-
-  if (nmax - nmin <= 1)
-    {end_tracing("balance","/home/mc462/basilisk/src/grid/balance.h",244);return false;}
-
-  scalar  newpid=new_scalar("newpid");
-  double zn = z_indexing (newpid, mpi.leaves);
-  if (pid() == 0)
-    if (!(zn + 1 == nt)) qassert ("/home/mc462/basilisk/src/grid/balance.h", 249, "zn + 1 == nt");
-
-  FILE * fp = NULL;
-#line 261 "/home/mc462/basilisk/src/grid/balance.h"
-  bool next = false, prev = false;
-  {foreach_cell_all() {
-    if (is_local(cell)) {
-      int pid = balanced_pid (val(newpid,0,0,0), nt, mpi.npe);
-      pid = clamp (pid, cell.pid - 1, cell.pid + 1);
-      if (pid == pid() + 1)
- next = true;
-      else if (pid == pid() - 1)
- prev = true;
-      ((NewPid *)&val(newpid,0,0,0))->pid = pid + 1;
-      ((NewPid *)&val(newpid,0,0,0))->leaf = is_leaf(cell);
-      ((NewPid *)&val(newpid,0,0,0))->prolongation = (!is_leaf(cell) && !cell.neighbors && cell.pid >= 0);
-      if (fp)
- fprintf (fp, "%g %g %d %d newpid\n", x, y, ((NewPid *)&val(newpid,0,0,0))->pid - 1, cell.pid);
-    }
-    else
-      val(newpid,0,0,0) = 0;
-  }end_foreach_cell_all();}
-  for (int l = 0; l <= depth(); l++)
-    { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->level) _b->level (_b,((scalar[]) {newpid,{-1}}), l); };
-#line 305 "/home/mc462/basilisk/src/grid/balance.h"
-  Array * anext = next ? neighborhood (newpid, pid() + 1, fp) : array_new();
-  Array * aprev = prev ? neighborhood (newpid, pid() - 1, fp) : array_new();
-
-  if (fp)
-    fflush (fp);
-
-  check_flags();
-
-
-  MPI_Request rprev[2], rnext[2];
-  if (pid() > 0)
-    send_tree (aprev, pid() - 1, rprev);
-  if (pid() < npe() - 1)
-    send_tree (anext, pid() + 1, rnext);
-
-
-  if (pid() < npe() - 1)
-    receive_tree (pid() + 1, newpid, fp);
-  if (pid() > 0)
-    receive_tree (pid() - 1, newpid, fp);
-
-
-  if (pid() > 0)
-    wait_tree (aprev, rprev);
-  array_free (aprev);
-  if (pid() < npe() - 1)
-    wait_tree (anext, rnext);
-  array_free (anext);
-
-  if (fp)
-    fflush (fp);
-
-
-  int pid_changed = false;
-  {foreach_cell_all() {
-    if (cell.pid >= 0) {
-      if (is_newpid()) {
- if (fp)
-   fprintf (fp, "%g %g %g %d %d %d %d %d new\n",
-     x, y, z, ((NewPid *)&val(newpid,0,0,0))->pid - 1, cell.pid,
-     is_leaf(cell), cell.neighbors, ((NewPid *)&val(newpid,0,0,0))->leaf);
- if (cell.pid != ((NewPid *)&val(newpid,0,0,0))->pid - 1) {
-   cell.pid = ((NewPid *)&val(newpid,0,0,0))->pid - 1;
-   cell.flags &= ~(active|border);
-   if (is_local(cell))
-     cell.flags |= active;
-   pid_changed = true;
- }
- if (((NewPid *)&val(newpid,0,0,0))->leaf && !is_leaf(cell) && cell.neighbors)
-   coarsen_cell_recursive (point, NULL);
-      }
-      else if (level > 0 && ((NewPid *)&coarse(newpid,0,0,0))->leaf)
- cell.pid = aparent(0,0,0).pid;
-    }
-
-    if (!cell.neighbors && allocated_child(0,0,0)) {
-      if (fp)
- fprintf (fp, "%g %g %g %d %d freechildren\n",
-   x, y, z, ((NewPid *)&val(newpid,0,0,0))->pid - 1, cell.pid);
-      free_children (point);
-    }
-  }end_foreach_cell_all();}
-
-  if (((Tree *)grid)->dirty || pid_changed) {
-
-
-    {foreach_cell_post (!is_leaf (cell))
-      if (!is_leaf(cell) && !is_local(cell)) {
- unsigned short flags = cell.flags & ~active;
- {foreach_child()
-   if (is_active(cell)) {
-     flags |= active; foreach_child_break();
-   }end_foreach_child()}
- cell.flags = flags;
-      }end_foreach_cell_post();}
-
-    flag_border_cells();
-    pid_changed = true;
-  }
-
-  if (fp)
-    fclose (fp);
-
-  mpi_all_reduce (pid_changed, MPI_INT, MPI_MAX);
-  if (pid_changed)
-    mpi_boundary_update_buffers();
-
-  {delete((scalar*)((scalar[]){newpid,{-1}}));{end_tracing("balance","/home/mc462/basilisk/src/grid/balance.h",392);return pid_changed;}}delete((scalar*)((scalar[]){newpid,{-1}}));
-end_tracing("balance","/home/mc462/basilisk/src/grid/balance.h",393);}
-
-void mpi_boundary_update (scalar * list)
-{
-  mpi_boundary_update_buffers();
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    _attribute[s.i].dirty = true;}}
-  grid->tn = 0;
-  boundary_internal ((scalar *)list, "/home/mc462/basilisk/src/grid/balance.h", 401);
-  while (balance());
-}
-#line 1686 "/home/mc462/basilisk/src/grid/tree.h"
-#else
-void mpi_boundary_refine (scalar * list){}
-void mpi_boundary_coarsen (int a, int b){}
-void mpi_boundary_update (scalar * list) {
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
-    _attribute[s.i].dirty = true;}}
-  boundary_internal ((scalar *)list, "/home/mc462/basilisk/src/grid/tree.h", 1692);
-}
-#endif
-#line 4 "/home/mc462/basilisk/src/grid/quadtree.h"
-
-void quadtree_methods() {
-  tree_methods();
-}
-#line 15 "drop-cpp.c"
-#line 1 "drop.c"
-#line 25 "drop.c"
 #line 1 "navier-stokes/centered.h"
 #line 1 "/home/mc462/basilisk/src/navier-stokes/centered.h"
 #line 27 "/home/mc462/basilisk/src/navier-stokes/centered.h"
@@ -8414,7 +4866,7 @@ void timer_print (timer t, int i, size_t tnc)
 {
   timing s = timer_timing (t, i, tnc, NULL);
   fprintf (fout,
-    "\n# " "Quadtree"
+    "\n# " "Multigrid"
     ", %d steps, %g CPU, %.4g real, %.3g points.step/s, %d var\n",
     i, s.cpu, s.real, s.speed, (int) (datasize/sizeof(double)));
 #if 1
@@ -8922,8 +5374,8 @@ void output_field (scalar * list,
       }
       else {
  Point point = locate (x, y
-#line 1629 "/home/mc462/basilisk/src/grid/tree.h"
-, 0.
+#line 806 "/home/mc462/basilisk/src/grid/multigrid.h"
+, 0
 #line 60 "/home/mc462/basilisk/src/output.h"
 );int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
  int k = 0;
@@ -8992,8 +5444,8 @@ void output_matrix (scalar f, FILE * fp, int n, bool linear)
 );
       else {
  Point point = locate (xp, yp
-#line 1629 "/home/mc462/basilisk/src/grid/tree.h"
-, 0.
+#line 806 "/home/mc462/basilisk/src/grid/multigrid.h"
+, 0
 #line 148 "/home/mc462/basilisk/src/output.h"
 );int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
  if (!(point.level >= 0)) qassert ("/home/mc462/basilisk/src/output.h", 149, "point.level >= 0");
@@ -9457,8 +5909,8 @@ void output_grd (scalar f,
  }
  else {
    Point point = locate (xp, yp
-#line 1629 "/home/mc462/basilisk/src/grid/tree.h"
-, 0.
+#line 806 "/home/mc462/basilisk/src/grid/multigrid.h"
+, 0
 #line 717 "/home/mc462/basilisk/src/output.h"
 );int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
    if (point.level < 0 || val(mask,0,0,0) < 0.)
@@ -9475,8 +5927,8 @@ void output_grd (scalar f,
 );
       else {
  Point point = locate (xp, yp
-#line 1629 "/home/mc462/basilisk/src/grid/tree.h"
-, 0.
+#line 806 "/home/mc462/basilisk/src/grid/multigrid.h"
+, 0
 #line 727 "/home/mc462/basilisk/src/output.h"
 );int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
  v = point.level >= 0 ? val(f,0,0,0) : 1e30;
@@ -9522,7 +5974,7 @@ void output_gfs (FILE * fp,
 
 #if 1
 
-
+  not_mpi_compatible();
 
   FILE * sfp = fp;
   if (file == NULL) {
@@ -9811,9 +6263,9 @@ void dump (const char * file,
           dump_version };
 
 
-
-
-
+  for (int i = 0; i < 2; i++)
+    (&header.n.x)[i] = mpi_dims[i];
+  MPI_Barrier (MPI_COMM_WORLD);
 
 
   if (pid() == 0)
@@ -9872,15 +6324,25 @@ bool restore (const char * file,
     fprintf (ferr, "restore(): error: expecting header\n");
     exit (1);
   }
+#line 1187 "/home/mc462/basilisk/src/output.h"
+  if (header.npe != npe()) {
+    fprintf (ferr,
+      "restore(): error: the number of processes don't match:"
+      " %d != %d\n",
+      header.npe, npe());
+    exit (1);
+  }
+  dimensions (header.n.x, header.n.y, header.n.z);
+  double n = header.n.x;
+  int depth = header.depth;
+  while (n > 1)
+    depth++, n /= 2;
+  init_grid (1 << depth);
 
 
-  init_grid (1);
-  {foreach_cell() {
-    cell.pid = pid();
-    cell.flags |= active;
-  }end_foreach_cell();}
-  ((Tree *)grid)->dirty = true;
-#line 1205 "/home/mc462/basilisk/src/output.h"
+
+
+
   bool restore_all = (list == all);
   scalar * slist = dump_list (list ? list : all);
   if (header.version == 161020) {
@@ -9945,11 +6407,47 @@ bool restore (const char * file,
     origin (o[0], o[1], o[2]);
     size (o[3]);
   }
-#line 1280 "/home/mc462/basilisk/src/output.h"
+
+
+  long cell_size = sizeof(unsigned) + header.len*sizeof(double);
+  long offset = pid()*((1 << 2*(header.depth + 1)) - 1)/
+    ((1 << 2) - 1)*cell_size;
+  if (fseek (fp, offset, SEEK_CUR) < 0) {
+    perror ("restore(): error while seeking");
+    exit (1);
+  }
+
+
   scalar * listm = is_constant(cm) ? NULL : (scalar *)((vector[]){fm,{{-1},{-1}}});
 
-  restore_mpi (fp, slist);
-#line 1310 "/home/mc462/basilisk/src/output.h"
+
+
+  {foreach_cell() {
+    unsigned flags;
+    if (fread (&flags, sizeof(unsigned), 1, fp) != 1) {
+      fprintf (ferr, "restore(): error: expecting 'flags'\n");
+      exit (1);
+    }
+
+    fseek (fp, sizeof(double), SEEK_CUR);
+    {scalar*_i=(scalar*)( slist);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){ {
+      double val;
+      if (fread (&val, sizeof(double), 1, fp) != 1) {
+ fprintf (ferr, "restore(): error: expecting a scalar\n");
+ exit (1);
+      }
+      if (s.i != INT_MAX)
+ val(s,0,0,0) = val;
+    }}}
+    if (!(flags & leaf) && is_leaf(cell))
+      refine_cell (point, listm, 0, NULL);
+    if (is_leaf(cell))
+      continue;
+  }end_foreach_cell();}
+  {scalar*_i=(scalar*)( all);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
+    _attribute[s.i].dirty = true;}}
+
+
   scalar * other = NULL;
   {scalar*_i=(scalar*)( all);if(_i)for(scalar s=*_i;(&s)->i>=0;s=*++_i){
     if (!list_lookup (slist, s) && !list_lookup (listm, s))
@@ -10845,35 +7343,16 @@ static double residual (scalar * al, scalar * bl, scalar * resl, void * data)
           vector alpha = p->alpha;
           scalar lambda = p->lambda;
   double maxres = 0.;
-
-
-  vector  g=new_face_vector("g");
-  foreach_face_stencil(){_stencil_is_face_x(){
-    {_stencil_val_a(g.x,0,0,0); _stencil_val(alpha.x,0,0,0);_stencil_val(a,0,0,0); _stencil_val(a,0 -1,0,0);  }}end__stencil_is_face_x()
-#line 348
-_stencil_is_face_y(){
-    {_stencil_val_a(g.y,0,0,0); _stencil_val(alpha.y,0,0,0);_stencil_val(a,0,0,0); _stencil_val(a,0,0 -1,0);  }}end__stencil_is_face_y()}end_foreach_face_stencil();
-  
-#line 348
-if(!is_constant(alpha.x)){{foreach_face_generic(){is_face_x(){
-    val(g.x,0,0,0) = val(alpha.x,0,0,0)*((val(a,0,0,0) - val(a,0 -1,0,0))/Delta);}end_is_face_x()
-#line 348
-is_face_y(){
-    val(g.y,0,0,0) = val(alpha.y,0,0,0)*((val(a,0,0,0) - val(a,0,0 -1,0))/Delta);}end_is_face_y()}end_foreach_face_generic();}}else {struct{double x,y;}_const_alpha={_constant[alpha.x.i-_NVARMAX],_constant[alpha.y.i-_NVARMAX]};NOT_UNUSED(_const_alpha);
-  {
-#line 348
-foreach_face_generic(){is_face_x(){
-    val(g.x,0,0,0) = _const_alpha.x*((val(a,0,0,0) - val(a,0 -1,0,0))/Delta);}end_is_face_x()
-#line 348
-is_face_y(){
-    val(g.y,0,0,0) = _const_alpha.y*((val(a,0,0,0) - val(a,0,0 -1,0))/Delta);}end_is_face_y()}end_foreach_face_generic();}}
+#line 365 "/home/mc462/basilisk/src/poisson.h"
   foreach_stencil () {
     _stencil_val_a(res,0,0,0); _stencil_val(b,0,0,0); _stencil_val(lambda,0,0,0);_stencil_val(a,0,0,0);  
     
-      {_stencil_val_r(res,0,0,0);_stencil_val(g.x,1,0,0); _stencil_val(g.x,0,0,0);   }
+      {_stencil_val_r(res,0,0,0);_stencil_val(alpha.x,0,0,0);_stencil_val(a,0,0,0); _stencil_val(a,0 -1,0,0);
+  _stencil_val(alpha.x,1,0,0);_stencil_val(a,1,0,0); _stencil_val(a,1 -1,0,0);     }
       
-#line 353
-{_stencil_val_r(res,0,0,0);_stencil_val(g.y,0,1,0); _stencil_val(g.y,0,0,0);   }
+#line 368
+{_stencil_val_r(res,0,0,0);_stencil_val(alpha.y,0,0,0);_stencil_val(a,0,0,0); _stencil_val(a,0,0 -1,0);
+  _stencil_val(alpha.y,0,1,0);_stencil_val(a,0,1,0); _stencil_val(a,0,1 -1,0);     }
 
 
 
@@ -10890,22 +7369,23 @@ _stencil_val(res,0,0,0);
 
         
   
-#line 362
+#line 378
 }end_foreach_stencil();
-  
-#line 350
-if(!is_constant(lambda)){
+#line 365 "/home/mc462/basilisk/src/poisson.h"
+  if(!is_constant(lambda) && !is_constant(alpha.x)){
 #undef OMP_PARALLEL
 #define OMP_PARALLEL()
 OMP(omp parallel reduction(max:maxres)){
-#line 350
+#line 365
 foreach () {
     val(res,0,0,0) = val(b,0,0,0) - val(lambda,0,0,0)*val(a,0,0,0);
     
-      val(res,0,0,0) -= (val(g.x,1,0,0) - val(g.x,0,0,0))/Delta;
+      val(res,0,0,0) += (val(alpha.x,0,0,0)*((val(a,0,0,0) - val(a,0 -1,0,0))/Delta) -
+  val(alpha.x,1,0,0)*((val(a,1,0,0) - val(a,1 -1,0,0))/Delta))/Delta;
       
-#line 353
-val(res,0,0,0) -= (val(g.y,0,1,0) - val(g.y,0,0,0))/Delta;
+#line 368
+val(res,0,0,0) += (val(alpha.y,0,0,0)*((val(a,0,0,0) - val(a,0,0 -1,0))/Delta) -
+  val(alpha.y,0,1,0)*((val(a,0,1,0) - val(a,0,1 -1,0))/Delta))/Delta;
 
 
 
@@ -10918,20 +7398,23 @@ val(res,0,0,0) -= (val(g.y,0,1,0) - val(g.y,0,0,0))/Delta;
 #undef OMP_PARALLEL
 #define OMP_PARALLEL() OMP(omp parallel)
 }
-#line 362
-}else {double _const_lambda=_constant[lambda.i-_NVARMAX];NOT_UNUSED(_const_lambda);
+#line 378
+}else if(is_constant(lambda) && !is_constant(alpha.x)){double _const_lambda=_constant[lambda.i-_NVARMAX];NOT_UNUSED(_const_lambda);
+#line 365 "/home/mc462/basilisk/src/poisson.h"
   
 #undef OMP_PARALLEL
 #define OMP_PARALLEL()
 OMP(omp parallel reduction(max:maxres)){
-#line 350
+#line 365
 foreach () {
     val(res,0,0,0) = val(b,0,0,0) - _const_lambda*val(a,0,0,0);
     
-      val(res,0,0,0) -= (val(g.x,1,0,0) - val(g.x,0,0,0))/Delta;
+      val(res,0,0,0) += (val(alpha.x,0,0,0)*((val(a,0,0,0) - val(a,0 -1,0,0))/Delta) -
+  val(alpha.x,1,0,0)*((val(a,1,0,0) - val(a,1 -1,0,0))/Delta))/Delta;
       
-#line 353
-val(res,0,0,0) -= (val(g.y,0,1,0) - val(g.y,0,0,0))/Delta;
+#line 368
+val(res,0,0,0) += (val(alpha.y,0,0,0)*((val(a,0,0,0) - val(a,0,0 -1,0))/Delta) -
+  val(alpha.y,0,1,0)*((val(a,0,1,0) - val(a,0,1 -1,0))/Delta))/Delta;
 
 
 
@@ -10944,10 +7427,68 @@ val(res,0,0,0) -= (val(g.y,0,1,0) - val(g.y,0,0,0))/Delta;
 #undef OMP_PARALLEL
 #define OMP_PARALLEL() OMP(omp parallel)
 }
-#line 362
+#line 378
+}else if(!is_constant(lambda) && is_constant(alpha.x)){struct{double x,y;}_const_alpha={_constant[alpha.x.i-_NVARMAX],_constant[alpha.y.i-_NVARMAX]};NOT_UNUSED(_const_alpha);
+#line 365 "/home/mc462/basilisk/src/poisson.h"
+  
+#undef OMP_PARALLEL
+#define OMP_PARALLEL()
+OMP(omp parallel reduction(max:maxres)){
+#line 365
+foreach () {
+    val(res,0,0,0) = val(b,0,0,0) - val(lambda,0,0,0)*val(a,0,0,0);
+    
+      val(res,0,0,0) += (_const_alpha.x*((val(a,0,0,0) - val(a,0 -1,0,0))/Delta) -
+  _const_alpha.x*((val(a,1,0,0) - val(a,1 -1,0,0))/Delta))/Delta;
+      
+#line 368
+val(res,0,0,0) += (_const_alpha.y*((val(a,0,0,0) - val(a,0,0 -1,0))/Delta) -
+  _const_alpha.y*((val(a,0,1,0) - val(a,0,1 -1,0))/Delta))/Delta;
+
+
+
+
+
+
+    if (fabs (val(res,0,0,0)) > maxres)
+      maxres = fabs (val(res,0,0,0));
+  }end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
+#undef OMP_PARALLEL
+#define OMP_PARALLEL() OMP(omp parallel)
 }
-#line 380 "/home/mc462/basilisk/src/poisson.h"
-  {delete((scalar*)((vector[]){g,{{-1},{-1}}}));return maxres;}delete((scalar*)((vector[]){g,{{-1},{-1}}}));
+#line 378
+}else {double _const_lambda=_constant[lambda.i-_NVARMAX];NOT_UNUSED(_const_lambda);struct{double x,y;}_const_alpha={_constant[alpha.x.i-_NVARMAX],_constant[alpha.y.i-_NVARMAX]};NOT_UNUSED(_const_alpha);
+#line 365 "/home/mc462/basilisk/src/poisson.h"
+  
+#undef OMP_PARALLEL
+#define OMP_PARALLEL()
+OMP(omp parallel reduction(max:maxres)){
+#line 365
+foreach () {
+    val(res,0,0,0) = val(b,0,0,0) - _const_lambda*val(a,0,0,0);
+    
+      val(res,0,0,0) += (_const_alpha.x*((val(a,0,0,0) - val(a,0 -1,0,0))/Delta) -
+  _const_alpha.x*((val(a,1,0,0) - val(a,1 -1,0,0))/Delta))/Delta;
+      
+#line 368
+val(res,0,0,0) += (_const_alpha.y*((val(a,0,0,0) - val(a,0,0 -1,0))/Delta) -
+  _const_alpha.y*((val(a,0,1,0) - val(a,0,1 -1,0))/Delta))/Delta;
+
+
+
+
+
+
+    if (fabs (val(res,0,0,0)) > maxres)
+      maxres = fabs (val(res,0,0,0));
+  }end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
+#undef OMP_PARALLEL
+#define OMP_PARALLEL() OMP(omp parallel)
+}
+#line 378
+}
+
+  return maxres;
 }
 #line 392 "/home/mc462/basilisk/src/poisson.h"
 mgstats poisson (scalar a, scalar b,
@@ -11311,241 +7852,246 @@ static double residual_viscosity (scalar * a, scalar * b, scalar * resl,
   double dt = p->dt;
   vector u = (*((vector *)&(a[0]))), r = (*((vector *)&(b[0]))), res = (*((vector *)&(resl[0])));
   double maxres = 0.;
-#line 221 "/home/mc462/basilisk/src/viscosity.h"
-  boundary_internal ((scalar *)((vector[]){u,{{-1},{-1}}}), "/home/mc462/basilisk/src/viscosity.h", 221);
+#line 250 "/home/mc462/basilisk/src/viscosity.h"
+  foreach_stencil ()
+    { {
+      _stencil_val_a(res.x,0,0,0); _stencil_val(r.x,0,0,0);_stencil_val(u.x,0,0,0);
+_stencil_val(rho,0,0,0);_stencil_val(mu.x,1,0,0);_stencil_val(u.x,1,0,0); _stencil_val(u.x,0,0,0);
+_stencil_val(mu.x,0,0,0);_stencil_val(u.x,0,0,0); _stencil_val(u.x,-1,0,0); 
 
-   {
-    vector  taux=new_face_vector("taux");
-    foreach_face_stencil()_stencil_is_face_x(){
-      {_stencil_val_a(taux.x,0,0,0);_stencil_val(mu.x,0,0,0);_stencil_val(u.x,0,0,0); _stencil_val(u.x,-1,0,0);   }}end__stencil_is_face_x()end_foreach_face_stencil();
-    
-#line 225
-if(!is_constant(mu.x)){{foreach_face_generic()is_face_x(){
-      val(taux.x,0,0,0) = 2.*val(mu.x,0,0,0)*(val(u.x,0,0,0) - val(u.x,-1,0,0))/Delta;}end_is_face_x()end_foreach_face_generic();}}else {struct{double x,y;}_const_mu={_constant[mu.x.i-_NVARMAX],_constant[mu.y.i-_NVARMAX]};NOT_UNUSED(_const_mu);
-    {
-#line 225
-foreach_face_generic()is_face_x(){
-      val(taux.x,0,0,0) = 2.*_const_mu.x*(val(u.x,0,0,0) - val(u.x,-1,0,0))/Delta;}end_is_face_x()end_foreach_face_generic();}}
-
-      foreach_face_stencil()_stencil_is_face_y(){
- {_stencil_val_a(taux.y,0,0,0); _stencil_val(mu.y,0,0,0);_stencil_val(u.x,0,0,0); _stencil_val(u.x,0,-1,0);
+_stencil_val(mu.y,0,1,0);_stencil_val(u.x,0,1,0); _stencil_val(u.x,0,0,0);
+_stencil_val(u.y,1,0,0); _stencil_val(u.y,1,1,0);
+_stencil_val(u.y,-1,0,0); _stencil_val(u.y,-1,1,0); 
+_stencil_val(mu.y,0,0,0);_stencil_val(u.x,0,0,0); _stencil_val(u.x,0,-1,0);
 _stencil_val(u.y,1,-1,0); _stencil_val(u.y,1,0,0);
-_stencil_val(u.y,-1,-1,0); _stencil_val(u.y,-1,0,0);    
-        
-      
-#line 231
-}}end__stencil_is_face_y()end_foreach_face_stencil();
-
-      
-#line 228
-if(!is_constant(mu.x)){{foreach_face_generic()is_face_y(){
- val(taux.y,0,0,0) = val(mu.y,0,0,0)*(val(u.x,0,0,0) - val(u.x,0,-1,0) +
-      (val(u.y,1,-1,0) + val(u.y,1,0,0))/4. -
-      (val(u.y,-1,-1,0) + val(u.y,-1,0,0))/4.)/Delta;}end_is_face_y()end_foreach_face_generic();}}else {struct{double x,y;}_const_mu={_constant[mu.x.i-_NVARMAX],_constant[mu.y.i-_NVARMAX]};NOT_UNUSED(_const_mu);
-
-      {
-#line 228
-foreach_face_generic()is_face_y(){
- val(taux.y,0,0,0) = _const_mu.y*(val(u.x,0,0,0) - val(u.x,0,-1,0) +
-      (val(u.y,1,-1,0) + val(u.y,1,0,0))/4. -
-      (val(u.y,-1,-1,0) + val(u.y,-1,0,0))/4.)/Delta;}end_is_face_y()end_foreach_face_generic();}}
-
-
-
-
-
-
-
-    foreach_stencil () {   
-      
-      
- { _stencil_val(taux.x,1,0,0); _stencil_val(taux.x,0,0,0);  }
- 
-#line 242
-{ _stencil_val(taux.y,0,1,0); _stencil_val(taux.y,0,0,0);  }
-      _stencil_val_a(res.x,0,0,0); _stencil_val(r.x,0,0,0);_stencil_val(u.x,0,0,0);_stencil_val(rho,0,0,0);
+_stencil_val(u.y,-1,-1,0); _stencil_val(u.y,-1,0,0);
+#line 272
 _stencil_val(res.x,0,0,0);
- {_stencil_val(res.x,0,0,0);   }     
+ {_stencil_val(res.x,0,0,0);   }    
+         
+      
+
+       
+            
+          
+       
+         
+       
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    
           
     
-#line 246
-}end_foreach_stencil();
-
-
-
-
-
-
-
-    
-#line 239
-if(!is_constant(rho)){
-#undef OMP_PARALLEL
-#define OMP_PARALLEL()
-OMP(omp parallel reduction(max:maxres)){
-#line 239
-foreach () {
-      double d = 0.;
-      
- d += val(taux.x,1,0,0) - val(taux.x,0,0,0);
- 
-#line 242
-d += val(taux.y,0,1,0) - val(taux.y,0,0,0);
-      val(res.x,0,0,0) = val(r.x,0,0,0) - ((coord){1.,1.}).x*val(u.x,0,0,0) + dt/val(rho,0,0,0)*d/Delta;
-      if (fabs (val(res.x,0,0,0)) > maxres)
- maxres = fabs (val(res.x,0,0,0));
-    }end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
-#undef OMP_PARALLEL
-#define OMP_PARALLEL() OMP(omp parallel)
-}
-#line 246
-}else {double _const_rho=_constant[rho.i-_NVARMAX];NOT_UNUSED(_const_rho);
-
-
-
-
-
-
-
-    
-#undef OMP_PARALLEL
-#define OMP_PARALLEL()
-OMP(omp parallel reduction(max:maxres)){
-#line 239
-foreach () {
-      double d = 0.;
-      
- d += val(taux.x,1,0,0) - val(taux.x,0,0,0);
- 
-#line 242
-d += val(taux.y,0,1,0) - val(taux.y,0,0,0);
-      val(res.x,0,0,0) = val(r.x,0,0,0) - ((coord){1.,1.}).x*val(u.x,0,0,0) + dt/_const_rho*d/Delta;
-      if (fabs (val(res.x,0,0,0)) > maxres)
- maxres = fabs (val(res.x,0,0,0));
-    }end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
-#undef OMP_PARALLEL
-#define OMP_PARALLEL() OMP(omp parallel)
-}
-#line 246
-}delete((scalar*)((vector[]){taux,{{-1},{-1}}}));
-  } 
-#line 223
+} 
+#line 251
 {
-    vector  taux=new_face_vector("taux");
-    foreach_face_stencil()_stencil_is_face_y(){
-      {_stencil_val_a(taux.y,0,0,0);_stencil_val(mu.y,0,0,0);_stencil_val(u.y,0,0,0); _stencil_val(u.y,0,-1,0);   }}end__stencil_is_face_y()end_foreach_face_stencil();
-    
-#line 225
-if(!is_constant(mu.y)){{foreach_face_generic()is_face_y(){
-      val(taux.y,0,0,0) = 2.*val(mu.y,0,0,0)*(val(u.y,0,0,0) - val(u.y,0,-1,0))/Delta;}end_is_face_y()end_foreach_face_generic();}}else {struct{double x,y;}_const_mu={_constant[mu.y.i-_NVARMAX],_constant[mu.x.i-_NVARMAX]};NOT_UNUSED(_const_mu);
-    {
-#line 225
-foreach_face_generic()is_face_y(){
-      val(taux.y,0,0,0) = 2.*_const_mu.y*(val(u.y,0,0,0) - val(u.y,0,-1,0))/Delta;}end_is_face_y()end_foreach_face_generic();}}
+      _stencil_val_a(res.y,0,0,0); _stencil_val(r.y,0,0,0);_stencil_val(u.y,0,0,0);
+_stencil_val(rho,0,0,0);_stencil_val(mu.y,0,1,0);_stencil_val(u.y,0,1,0); _stencil_val(u.y,0,0,0);
+_stencil_val(mu.y,0,0,0);_stencil_val(u.y,0,0,0); _stencil_val(u.y,0,-1,0); 
 
-      foreach_face_stencil()_stencil_is_face_x(){
- {_stencil_val_a(taux.x,0,0,0); _stencil_val(mu.x,0,0,0);_stencil_val(u.y,0,0,0); _stencil_val(u.y,-1,0,0);
+_stencil_val(mu.x,1,0,0);_stencil_val(u.y,1,0,0); _stencil_val(u.y,0,0,0);
+_stencil_val(u.x,0,1,0); _stencil_val(u.x,1,1,0);
+_stencil_val(u.x,0,-1,0); _stencil_val(u.x,1,-1,0); 
+_stencil_val(mu.x,0,0,0);_stencil_val(u.y,0,0,0); _stencil_val(u.y,-1,0,0);
 _stencil_val(u.x,-1,1,0); _stencil_val(u.x,0,1,0);
-_stencil_val(u.x,-1,-1,0); _stencil_val(u.x,0,-1,0);    
-        
-      
-#line 231
-}}end__stencil_is_face_x()end_foreach_face_stencil();
-
-      
-#line 228
-if(!is_constant(mu.y)){{foreach_face_generic()is_face_x(){
- val(taux.x,0,0,0) = val(mu.x,0,0,0)*(val(u.y,0,0,0) - val(u.y,-1,0,0) +
-      (val(u.x,-1,1,0) + val(u.x,0,1,0))/4. -
-      (val(u.x,-1,-1,0) + val(u.x,0,-1,0))/4.)/Delta;}end_is_face_x()end_foreach_face_generic();}}else {struct{double x,y;}_const_mu={_constant[mu.y.i-_NVARMAX],_constant[mu.x.i-_NVARMAX]};NOT_UNUSED(_const_mu);
-
-      {
-#line 228
-foreach_face_generic()is_face_x(){
- val(taux.x,0,0,0) = _const_mu.x*(val(u.y,0,0,0) - val(u.y,-1,0,0) +
-      (val(u.x,-1,1,0) + val(u.x,0,1,0))/4. -
-      (val(u.x,-1,-1,0) + val(u.x,0,-1,0))/4.)/Delta;}end_is_face_x()end_foreach_face_generic();}}
-
-
-
-
-
-
-
-    foreach_stencil () {   
-      
-      
- { _stencil_val(taux.y,0,1,0); _stencil_val(taux.y,0,0,0);  }
- 
-#line 242
-{ _stencil_val(taux.x,1,0,0); _stencil_val(taux.x,0,0,0);  }
-      _stencil_val_a(res.y,0,0,0); _stencil_val(r.y,0,0,0);_stencil_val(u.y,0,0,0);_stencil_val(rho,0,0,0);
+_stencil_val(u.x,-1,-1,0); _stencil_val(u.x,0,-1,0);
+#line 272
 _stencil_val(res.y,0,0,0);
- {_stencil_val(res.y,0,0,0);   }     
+ {_stencil_val(res.y,0,0,0);   }    
+         
+      
+
+       
+            
+          
+       
+         
+       
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    
           
     
-#line 246
-}end_foreach_stencil();
-
-
-
-
-
-
-
-    
-#line 239
-if(!is_constant(rho)){
+}}end_foreach_stencil();
+#line 250 "/home/mc462/basilisk/src/viscosity.h"
+  if(!is_constant(rho) && !is_constant(mu.x)){
 #undef OMP_PARALLEL
 #define OMP_PARALLEL()
 OMP(omp parallel reduction(max:maxres)){
-#line 239
-foreach () {
-      double d = 0.;
-      
- d += val(taux.y,0,1,0) - val(taux.y,0,0,0);
- 
-#line 242
-d += val(taux.x,1,0,0) - val(taux.x,0,0,0);
-      val(res.y,0,0,0) = val(r.y,0,0,0) - ((coord){1.,1.}).y*val(u.y,0,0,0) + dt/val(rho,0,0,0)*d/Delta;
+#line 250
+foreach ()
+    { {
+      val(res.x,0,0,0) = val(r.x,0,0,0) - ((coord){1.,1.}).x*val(u.x,0,0,0) +
+        dt/val(rho,0,0,0)*(2.*val(mu.x,1,0,0)*(val(u.x,1,0,0) - val(u.x,0,0,0))
+    - 2.*val(mu.x,0,0,0)*(val(u.x,0,0,0) - val(u.x,-1,0,0))
+
+    + val(mu.y,0,1,0)*(val(u.x,0,1,0) - val(u.x,0,0,0) +
+          (val(u.y,1,0,0) + val(u.y,1,1,0))/4. -
+          (val(u.y,-1,0,0) + val(u.y,-1,1,0))/4.)
+    - val(mu.y,0,0,0)*(val(u.x,0,0,0) - val(u.x,0,-1,0) +
+       (val(u.y,1,-1,0) + val(u.y,1,0,0))/4. -
+       (val(u.y,-1,-1,0) + val(u.y,-1,0,0))/4.)
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    )/sq(Delta);
+      if (fabs (val(res.x,0,0,0)) > maxres)
+ maxres = fabs (val(res.x,0,0,0));
+    } 
+#line 251
+{
+      val(res.y,0,0,0) = val(r.y,0,0,0) - ((coord){1.,1.}).y*val(u.y,0,0,0) +
+        dt/val(rho,0,0,0)*(2.*val(mu.y,0,1,0)*(val(u.y,0,1,0) - val(u.y,0,0,0))
+    - 2.*val(mu.y,0,0,0)*(val(u.y,0,0,0) - val(u.y,0,-1,0))
+
+    + val(mu.x,1,0,0)*(val(u.y,1,0,0) - val(u.y,0,0,0) +
+          (val(u.x,0,1,0) + val(u.x,1,1,0))/4. -
+          (val(u.x,0,-1,0) + val(u.x,1,-1,0))/4.)
+    - val(mu.x,0,0,0)*(val(u.y,0,0,0) - val(u.y,-1,0,0) +
+       (val(u.x,-1,1,0) + val(u.x,0,1,0))/4. -
+       (val(u.x,-1,-1,0) + val(u.x,0,-1,0))/4.)
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    )/sq(Delta);
       if (fabs (val(res.y,0,0,0)) > maxres)
  maxres = fabs (val(res.y,0,0,0));
-    }end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
+    }}end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
 #undef OMP_PARALLEL
 #define OMP_PARALLEL() OMP(omp parallel)
 }
-#line 246
-}else {double _const_rho=_constant[rho.i-_NVARMAX];NOT_UNUSED(_const_rho);
-
-
-
-
-
-
-
-    
+#line 274
+}else if(is_constant(rho) && !is_constant(mu.x)){double _const_rho=_constant[rho.i-_NVARMAX];NOT_UNUSED(_const_rho);
+#line 250 "/home/mc462/basilisk/src/viscosity.h"
+  
 #undef OMP_PARALLEL
 #define OMP_PARALLEL()
 OMP(omp parallel reduction(max:maxres)){
-#line 239
-foreach () {
-      double d = 0.;
-      
- d += val(taux.y,0,1,0) - val(taux.y,0,0,0);
- 
-#line 242
-d += val(taux.x,1,0,0) - val(taux.x,0,0,0);
-      val(res.y,0,0,0) = val(r.y,0,0,0) - ((coord){1.,1.}).y*val(u.y,0,0,0) + dt/_const_rho*d/Delta;
+#line 250
+foreach ()
+    { {
+      val(res.x,0,0,0) = val(r.x,0,0,0) - ((coord){1.,1.}).x*val(u.x,0,0,0) +
+        dt/_const_rho*(2.*val(mu.x,1,0,0)*(val(u.x,1,0,0) - val(u.x,0,0,0))
+    - 2.*val(mu.x,0,0,0)*(val(u.x,0,0,0) - val(u.x,-1,0,0))
+
+    + val(mu.y,0,1,0)*(val(u.x,0,1,0) - val(u.x,0,0,0) +
+          (val(u.y,1,0,0) + val(u.y,1,1,0))/4. -
+          (val(u.y,-1,0,0) + val(u.y,-1,1,0))/4.)
+    - val(mu.y,0,0,0)*(val(u.x,0,0,0) - val(u.x,0,-1,0) +
+       (val(u.y,1,-1,0) + val(u.y,1,0,0))/4. -
+       (val(u.y,-1,-1,0) + val(u.y,-1,0,0))/4.)
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    )/sq(Delta);
+      if (fabs (val(res.x,0,0,0)) > maxres)
+ maxres = fabs (val(res.x,0,0,0));
+    } 
+#line 251
+{
+      val(res.y,0,0,0) = val(r.y,0,0,0) - ((coord){1.,1.}).y*val(u.y,0,0,0) +
+        dt/_const_rho*(2.*val(mu.y,0,1,0)*(val(u.y,0,1,0) - val(u.y,0,0,0))
+    - 2.*val(mu.y,0,0,0)*(val(u.y,0,0,0) - val(u.y,0,-1,0))
+
+    + val(mu.x,1,0,0)*(val(u.y,1,0,0) - val(u.y,0,0,0) +
+          (val(u.x,0,1,0) + val(u.x,1,1,0))/4. -
+          (val(u.x,0,-1,0) + val(u.x,1,-1,0))/4.)
+    - val(mu.x,0,0,0)*(val(u.y,0,0,0) - val(u.y,-1,0,0) +
+       (val(u.x,-1,1,0) + val(u.x,0,1,0))/4. -
+       (val(u.x,-1,-1,0) + val(u.x,0,-1,0))/4.)
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    )/sq(Delta);
       if (fabs (val(res.y,0,0,0)) > maxres)
  maxres = fabs (val(res.y,0,0,0));
-    }end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
+    }}end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
 #undef OMP_PARALLEL
 #define OMP_PARALLEL() OMP(omp parallel)
 }
-#line 246
-}delete((scalar*)((vector[]){taux,{{-1},{-1}}}));
-  }
-#line 276 "/home/mc462/basilisk/src/viscosity.h"
+#line 274
+}else if(!is_constant(rho) && is_constant(mu.x)){struct{double x,y;}_const_mu={_constant[mu.x.i-_NVARMAX],_constant[mu.y.i-_NVARMAX]};NOT_UNUSED(_const_mu);
+#line 250 "/home/mc462/basilisk/src/viscosity.h"
+  
+#undef OMP_PARALLEL
+#define OMP_PARALLEL()
+OMP(omp parallel reduction(max:maxres)){
+#line 250
+foreach ()
+    { {
+      val(res.x,0,0,0) = val(r.x,0,0,0) - ((coord){1.,1.}).x*val(u.x,0,0,0) +
+        dt/val(rho,0,0,0)*(2.*_const_mu.x*(val(u.x,1,0,0) - val(u.x,0,0,0))
+    - 2.*_const_mu.x*(val(u.x,0,0,0) - val(u.x,-1,0,0))
+
+    + _const_mu.y*(val(u.x,0,1,0) - val(u.x,0,0,0) +
+          (val(u.y,1,0,0) + val(u.y,1,1,0))/4. -
+          (val(u.y,-1,0,0) + val(u.y,-1,1,0))/4.)
+    - _const_mu.y*(val(u.x,0,0,0) - val(u.x,0,-1,0) +
+       (val(u.y,1,-1,0) + val(u.y,1,0,0))/4. -
+       (val(u.y,-1,-1,0) + val(u.y,-1,0,0))/4.)
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    )/sq(Delta);
+      if (fabs (val(res.x,0,0,0)) > maxres)
+ maxres = fabs (val(res.x,0,0,0));
+    } 
+#line 251
+{
+      val(res.y,0,0,0) = val(r.y,0,0,0) - ((coord){1.,1.}).y*val(u.y,0,0,0) +
+        dt/val(rho,0,0,0)*(2.*_const_mu.y*(val(u.y,0,1,0) - val(u.y,0,0,0))
+    - 2.*_const_mu.y*(val(u.y,0,0,0) - val(u.y,0,-1,0))
+
+    + _const_mu.x*(val(u.y,1,0,0) - val(u.y,0,0,0) +
+          (val(u.x,0,1,0) + val(u.x,1,1,0))/4. -
+          (val(u.x,0,-1,0) + val(u.x,1,-1,0))/4.)
+    - _const_mu.x*(val(u.y,0,0,0) - val(u.y,-1,0,0) +
+       (val(u.x,-1,1,0) + val(u.x,0,1,0))/4. -
+       (val(u.x,-1,-1,0) + val(u.x,0,-1,0))/4.)
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    )/sq(Delta);
+      if (fabs (val(res.y,0,0,0)) > maxres)
+ maxres = fabs (val(res.y,0,0,0));
+    }}end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
+#undef OMP_PARALLEL
+#define OMP_PARALLEL() OMP(omp parallel)
+}
+#line 274
+}else {double _const_rho=_constant[rho.i-_NVARMAX];NOT_UNUSED(_const_rho);struct{double x,y;}_const_mu={_constant[mu.x.i-_NVARMAX],_constant[mu.y.i-_NVARMAX]};NOT_UNUSED(_const_mu);
+#line 250 "/home/mc462/basilisk/src/viscosity.h"
+  
+#undef OMP_PARALLEL
+#define OMP_PARALLEL()
+OMP(omp parallel reduction(max:maxres)){
+#line 250
+foreach ()
+    { {
+      val(res.x,0,0,0) = val(r.x,0,0,0) - ((coord){1.,1.}).x*val(u.x,0,0,0) +
+        dt/_const_rho*(2.*_const_mu.x*(val(u.x,1,0,0) - val(u.x,0,0,0))
+    - 2.*_const_mu.x*(val(u.x,0,0,0) - val(u.x,-1,0,0))
+
+    + _const_mu.y*(val(u.x,0,1,0) - val(u.x,0,0,0) +
+          (val(u.y,1,0,0) + val(u.y,1,1,0))/4. -
+          (val(u.y,-1,0,0) + val(u.y,-1,1,0))/4.)
+    - _const_mu.y*(val(u.x,0,0,0) - val(u.x,0,-1,0) +
+       (val(u.y,1,-1,0) + val(u.y,1,0,0))/4. -
+       (val(u.y,-1,-1,0) + val(u.y,-1,0,0))/4.)
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    )/sq(Delta);
+      if (fabs (val(res.x,0,0,0)) > maxres)
+ maxres = fabs (val(res.x,0,0,0));
+    } 
+#line 251
+{
+      val(res.y,0,0,0) = val(r.y,0,0,0) - ((coord){1.,1.}).y*val(u.y,0,0,0) +
+        dt/_const_rho*(2.*_const_mu.y*(val(u.y,0,1,0) - val(u.y,0,0,0))
+    - 2.*_const_mu.y*(val(u.y,0,0,0) - val(u.y,0,-1,0))
+
+    + _const_mu.x*(val(u.y,1,0,0) - val(u.y,0,0,0) +
+          (val(u.x,0,1,0) + val(u.x,1,1,0))/4. -
+          (val(u.x,0,-1,0) + val(u.x,1,-1,0))/4.)
+    - _const_mu.x*(val(u.y,0,0,0) - val(u.y,-1,0,0) +
+       (val(u.x,-1,1,0) + val(u.x,0,1,0))/4. -
+       (val(u.x,-1,-1,0) + val(u.x,0,-1,0))/4.)
+#line 271 "/home/mc462/basilisk/src/viscosity.h"
+    )/sq(Delta);
+      if (fabs (val(res.y,0,0,0)) > maxres)
+ maxres = fabs (val(res.y,0,0,0));
+    }}end_foreach();mpi_all_reduce_array(&maxres,double,MPI_MAX,1);
+#undef OMP_PARALLEL
+#define OMP_PARALLEL() OMP(omp parallel)
+}
+#line 274
+}
+
   return maxres;
 }
 #line 288 "/home/mc462/basilisk/src/viscosity.h"
@@ -11682,13 +8228,6 @@ foreach_face_generic(){is_face_x(){
 is_face_y(){
       val(alphav.y,0,0,0) = _const_fm.y;}end_is_face_y()}end_foreach_face_generic();}}
   }
-
-
-
-
-
-
-  _attribute[uf.x.i].refine = refine_face_solenoidal;
 #line 178 "/home/mc462/basilisk/src/navier-stokes/centered.h"
   foreach_stencil()
     {
@@ -12309,26 +8848,6 @@ static int end_timestep_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=
 
 #line 436
 static int end_timestep(const int i,const double t,Event *_ev){;return 0;}
-
-
-
-
-
-
-
-
-
-static int adapt_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i++)!=0;*ip=i;*tp=t;return ret;}
-#line 446 "/home/mc462/basilisk/src/navier-stokes/centered.h"
-      static int adapt(const int i,const double t,Event *_ev){tracing("adapt","/home/mc462/basilisk/src/navier-stokes/centered.h",446); {
-
-
-
-
-
-
-  event ("properties");
-}{end_tracing("adapt","/home/mc462/basilisk/src/navier-stokes/centered.h",454);return 0;}end_tracing("adapt","/home/mc462/basilisk/src/navier-stokes/centered.h",454);}
 #line 26 "drop.c"
 #line 1 "two-phase.h"
 #line 1 "/home/mc462/basilisk/src/two-phase.h"
@@ -12758,73 +9277,6 @@ _stencil_val(c,1,-1,0);_stencil_val(c,1,0,0); _stencil_val(c,1,1,0);
 return ;
 }
 #line 19 "/home/mc462/basilisk/src/fractions.h"
-#line 40 "/home/mc462/basilisk/src/fractions.h"
-void fraction_refine (Point point, scalar c)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-
-
-
-
-  double cc = val(c,0,0,0);
-  if (cc <= 0. || cc >= 1.)
-    {foreach_child()
-      val(c,0,0,0) = cc;end_foreach_child()}
-  else {
-
-
-
-
-    coord n = mycs (point, c);
-    double alpha = line_alpha (cc, n);
-
-
-
-
-
-
-    {foreach_child() {
-      static const coord a = {0.,0.,0.}, b = {.5,.5,.5};
-      coord nc;
-      
- nc.x = child.x*n.x;
- 
-#line 68
-nc.y = child.y*n.y;
-      val(c,0,0,0) = rectangle_fraction (nc, alpha, a, b);
-    }end_foreach_child()}
-  }
-}
-
-
-
-
-
-
-
-
-
-
-
-static void alpha_refine (Point point, scalar alpha)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  vector n = _attribute[alpha.i].n;
-  double alphac = 2.*val(alpha,0,0,0);
-  coord m;
-  
-    m.x = val(n.x,0,0,0);
-    
-#line 90
-m.y = val(n.y,0,0,0);
-  {foreach_child() {
-    val(alpha,0,0,0) = alphac;
-    
-      val(alpha,0,0,0) -= child.x*m.x/2.;
-      
-#line 94
-val(alpha,0,0,0) -= child.y*m.y/2.;
-  }end_foreach_child()}
-}
 #line 120 "/home/mc462/basilisk/src/fractions.h"
      
 void fractions (scalar Phi, scalar c,
@@ -13312,19 +9764,7 @@ val(n.y,0,0,0) = m.y;
       val(alpha,0,0,0) = line_alpha (val(c,0,0,0), m);
     }
   }end_foreach();}
-#line 480 "/home/mc462/basilisk/src/fractions.h"
-  
-    _attribute[n.x.i].refine = _attribute[n.x.i].prolongation = refine_injection;
-    
-#line 481
-_attribute[n.y.i].refine = _attribute[n.y.i].prolongation = refine_injection;
-
-
-
-
-  _attribute[alpha.i].n = n;
-  _attribute[alpha.i].refine = _attribute[alpha.i].prolongation = alpha_refine;
-
+#line 489 "/home/mc462/basilisk/src/fractions.h"
 end_tracing("reconstruction","/home/mc462/basilisk/src/fractions.h",489);}
 #line 509 "/home/mc462/basilisk/src/fractions.h"
      
@@ -13539,119 +9979,17 @@ static void _stencil_vof_concentration_gradient_y (Point point, scalar c, scalar
 #line 75
 return ;
 }
-
-
-
-
-
-
-static void vof_concentration_refine (Point point, scalar s)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-#line 84
-if(!is_constant(cm)){{
-  scalar f = _attribute[s.i].c;
-  if (val(cm,0,0,0) == 0. || (!_attribute[s.i].inverse && val(f,0,0,0) <= 0.) || (_attribute[s.i].inverse && val(f,0,0,0) >= 1.))
-    {foreach_child()
-      val(s,0,0,0) = 0.;end_foreach_child()}
-  else {
-    coord g;
-    
-      g.x = Delta*vof_concentration_gradient_x (point, f, s);
-      
-#line 92
-g.y = Delta*vof_concentration_gradient_y (point, f, s);
-    double sc = _attribute[s.i].inverse ? val(s,0,0,0)/(1. - val(f,0,0,0)) : val(s,0,0,0)/val(f,0,0,0), cmc = 4.*val(cm,0,0,0);
-    {foreach_child() {
-      val(s,0,0,0) = sc;
-      
- val(s,0,0,0) += child.x*g.x*val(cm,-child.x,0,0)/cmc;
- 
-#line 97
-val(s,0,0,0) += child.y*g.y*val(cm,0,-child.y,0)/cmc;
-      val(s,0,0,0) *= _attribute[s.i].inverse ? 1. - val(f,0,0,0) : val(f,0,0,0);
-    }end_foreach_child()}
-  }
-}}else {double _const_cm=_constant[cm.i-_NVARMAX];NOT_UNUSED(_const_cm);
-
-#line 84
-{
-  scalar f = _attribute[s.i].c;
-  if (_const_cm == 0. || (!_attribute[s.i].inverse && val(f,0,0,0) <= 0.) || (_attribute[s.i].inverse && val(f,0,0,0) >= 1.))
-    {foreach_child()
-      val(s,0,0,0) = 0.;end_foreach_child()}
-  else {
-    coord g;
-    
-      g.x = Delta*vof_concentration_gradient_x (point, f, s);
-      
-#line 92
-g.y = Delta*vof_concentration_gradient_y (point, f, s);
-    double sc = _attribute[s.i].inverse ? val(s,0,0,0)/(1. - val(f,0,0,0)) : val(s,0,0,0)/val(f,0,0,0), cmc = 4.*_const_cm;
-    {foreach_child() {
-      val(s,0,0,0) = sc;
-      
- val(s,0,0,0) += child.x*g.x*_const_cm/cmc;
- 
-#line 97
-val(s,0,0,0) += child.y*g.y*_const_cm/cmc;
-      val(s,0,0,0) *= _attribute[s.i].inverse ? 1. - val(f,0,0,0) : val(f,0,0,0);
-    }end_foreach_child()}
-  }
-}}
-
-#line 101
-}
-
-
-
-
-
-static int defaults_1_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
-
-
-
-
-
-
-#line 107
-      static int defaults_1(const int i,const double t,Event *_ev){tracing("defaults_1","/home/mc462/basilisk/src/vof.h",107);
-{
-  {scalar*_i=(scalar*)( interfaces);if(_i)for(scalar c=*_i;(&c)->i>=0;c=*++_i){ {
-    _attribute[c.i].refine = _attribute[c.i].prolongation = fraction_refine;
-    _attribute[c.i].dirty = true;
-    scalar * tracers = _attribute[c.i].tracers;
-    {scalar*_i=(scalar*)( tracers);if(_i)for(scalar t=*_i;(&t)->i>=0;t=*++_i){ {
-      _attribute[t.i].restriction = restriction_volume_average;
-      _attribute[t.i].refine = _attribute[t.i].prolongation = vof_concentration_refine;
-      _attribute[t.i].dirty = true;
-      _attribute[t.i].c = c;
-    }}}
-  }}}
-}{end_tracing("defaults_1","/home/mc462/basilisk/src/vof.h",120);return 0;}end_tracing("defaults_1","/home/mc462/basilisk/src/vof.h",120);}
-
-
-
-
-
-
-static int defaults_2_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
-
-
-
-
-
-
-
 #line 127
-      static int defaults_2(const int i,const double t,Event *_ev){tracing("defaults_2","/home/mc462/basilisk/src/vof.h",127);
+static int defaults_1_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
+#line 127 "/home/mc462/basilisk/src/vof.h"
+      static int defaults_1(const int i,const double t,Event *_ev){tracing("defaults_1","/home/mc462/basilisk/src/vof.h",127);
 {
   {scalar*_i=(scalar*)( interfaces);if(_i)for(scalar c=*_i;(&c)->i>=0;c=*++_i){ {
     scalar * tracers = _attribute[c.i].tracers;
     {scalar*_i=(scalar*)( tracers);if(_i)for(scalar t=*_i;(&t)->i>=0;t=*++_i){
       _attribute[t.i].depends = list_add (_attribute[t.i].depends, c);}}
   }}}
-}{end_tracing("defaults_2","/home/mc462/basilisk/src/vof.h",134);return 0;}end_tracing("defaults_2","/home/mc462/basilisk/src/vof.h",134);}
+}{end_tracing("defaults_1","/home/mc462/basilisk/src/vof.h",134);return 0;}end_tracing("defaults_1","/home/mc462/basilisk/src/vof.h",134);}
 
 
 
@@ -14476,15 +10814,7 @@ void vof_advection (scalar * interfaces, int i)
 
       scalar tc = new_scalar("tc");
       tcl = list_append (tcl, tc);
-
-
-      if (_attribute[t.i].refine != vof_concentration_refine) {
- _attribute[t.i].refine = _attribute[t.i].prolongation = vof_concentration_refine;
- _attribute[t.i].restriction = restriction_volume_average;
- _attribute[t.i].dirty = true;
- _attribute[t.i].c = c;
-      }
-
+#line 351 "/home/mc462/basilisk/src/vof.h"
     }}}
     foreach_stencil() {
       _stencil_val_a(cc,0,0,0);_stencil_val(c,0,0,0);    
@@ -14552,11 +10882,11 @@ double rho1 = 1., mu1 = 0., rho2 = 1., mu2 = 0.;
 vector  alphav={{9},{10}};
 scalar  rhov={11};
 
-static int defaults_3_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
+static int defaults_2_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
 
 
 #line 10
-      static int defaults_3(const int i,const double t,Event *_ev){tracing("defaults_3","/home/mc462/basilisk/src/two-phase-generic.h",10);
+      static int defaults_2(const int i,const double t,Event *_ev){tracing("defaults_2","/home/mc462/basilisk/src/two-phase-generic.h",10);
 {
   alpha = alphav;
   rho = rhov;
@@ -14576,17 +10906,14 @@ static int defaults_3_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*t
 , false
 #line 25 "/home/mc462/basilisk/src/two-phase-generic.h"
 );
-}{end_tracing("defaults_3","/home/mc462/basilisk/src/two-phase-generic.h",26);return 0;}end_tracing("defaults_3","/home/mc462/basilisk/src/two-phase-generic.h",26);}
+}{end_tracing("defaults_2","/home/mc462/basilisk/src/two-phase-generic.h",26);return 0;}end_tracing("defaults_2","/home/mc462/basilisk/src/two-phase-generic.h",26);}
 #line 50
 static int tracer_advection_0_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i++)!=0;*ip=i;*tp=t;return ret;}
 #line 50 "/home/mc462/basilisk/src/two-phase-generic.h"
-      static int tracer_advection_0(const int i,const double t,Event *_ev){tracing("tracer_advection_0","/home/mc462/basilisk/src/two-phase-generic.h",50);
+static int tracer_advection_0(const int i,const double t,Event *_ev){
 {
-#line 76 "/home/mc462/basilisk/src/two-phase-generic.h"
-  _attribute[f.i].prolongation = refine_bilinear;
-  _attribute[f.i].dirty = true;
-
-}{end_tracing("tracer_advection_0","/home/mc462/basilisk/src/two-phase-generic.h",79);return 0;}end_tracing("tracer_advection_0","/home/mc462/basilisk/src/two-phase-generic.h",79);}
+#line 79 "/home/mc462/basilisk/src/two-phase-generic.h"
+}return 0;}
 
 
 
@@ -14668,46 +10995,14 @@ foreach()
     val(rhov,0,0,0) = _const_cm*(clamp(val(f,0,0,0),0.,1.)*(rho1 - rho2) + rho2);end_foreach();}}
 
 
-  _attribute[f.i].prolongation = fraction_refine;
-  _attribute[f.i].dirty = true;
+
+
 
 }{end_tracing("properties_0","/home/mc462/basilisk/src/two-phase-generic.h",101);return 0;}end_tracing("properties_0","/home/mc462/basilisk/src/two-phase-generic.h",101);}
 #line 18 "/home/mc462/basilisk/src/two-phase.h"
 #line 27 "drop.c"
 #line 1 "curvature.h"
 #line 1 "/home/mc462/basilisk/src/curvature.h"
-#line 12 "/home/mc462/basilisk/src/curvature.h"
-static void curvature_restriction (Point point, scalar kappa)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  double k = 0., s = 0.;
-  {foreach_child()
-    if (val(kappa,0,0,0) != 1e30)
-      k += val(kappa,0,0,0), s++;end_foreach_child()}
-  val(kappa,0,0,0) = s ? k/s : 1e30;
-}
-
-
-
-
-
-
-
-static void curvature_prolongation (Point point, scalar kappa)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-  {foreach_child() {
-    double sk = 0., s = 0.;
-    for (int i = 0; i <= 1; i++)
-
-      for (int j = 0; j <= 1; j++)
-
-
-
-
-   if (coarse(kappa,child.x*i,child.y*j,child.z*k) != 1e30)
-     sk += coarse(kappa,child.x*i,child.y*j,child.z*k), s++;
-    val(kappa,0,0,0) = s ? sk/s : 1e30;
-  }end_foreach_child()}
-}
 #line 68 "/home/mc462/basilisk/src/curvature.h"
 #line 1 "heights.h"
 #line 1 "/home/mc462/basilisk/src/heights.h"
@@ -14974,6 +11269,335 @@ static void half_column (Point point, scalar c, vector h, vector cs, int j)
     }
   }
 }
+#line 49 "/home/mc462/basilisk/src/heights.h"
+static void _stencil_half_column (Point point, scalar c, vector h, vector cs, int j)
+{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;    
+
+
+
+
+
+
+  
+
+   {       
+
+
+
+
+
+
+
+     _stencil_val_o(c,0,0,0);            
+
+
+
+
+
+
+
+    
+    
+    if (j == 1) {
+
+
+
+
+_stencil_val_o(h.x,0,0,0);{ 
+      
+
+
+
+
+{     
+ _stencil_val_o(h.x,0,0,0); 
+_stencil_val_o(h.x,0,0,0);
+    
+     
+      
+#line 92
+}}   
+
+
+
+
+         
+
+
+
+
+      
+
+
+
+
+
+      
+      
+    
+#line 100
+}
+#line 109 "/home/mc462/basilisk/src/heights.h"
+    for (int i = 1; i <= 4; i++) { 
+_stencil_val_o(c,i*j,0,0); _stencil_val_o(cs.x,(i - 2)*j,0,0); 
+           
+  
+ 
+       
+         
+  
+ 
+        
+
+
+
+
+
+
+
+     
+   
+  
+   
+        
+        
+           
+        
+
+
+
+
+             
+#line 138 "/home/mc462/basilisk/src/heights.h"
+              
+              
+#line 156 "/home/mc462/basilisk/src/heights.h"
+      
+        
+    }
+
+
+
+
+
+    if (j == -1) {
+
+
+
+
+
+
+
+_stencil_val_o(c,0,0,0); _stencil_val_o(c,0,0,0);{
+ 
+{_stencil_val_a(h.x,0,0,0);  }
+{
+ {_stencil_val_a(h.x,0,0,0);  }
+
+
+
+
+
+ 
+{_stencil_val_a(h.x,0,0,0);        }}    
+      
+#line 183
+}
+
+
+
+
+
+
+
+                
+              
+      
+    
+#line 184
+}
+    else {
+#line 203
+{
+ {_stencil_val_a(h.x,0,0,0);  }
+ 
+{_stencil_val_a(h.x,0,0,0);        }}
+      
+#line 195 "/home/mc462/basilisk/src/heights.h"
+                
+   
+
+
+
+
+
+         
+      
+    
+
+
+}
+  } 
+#line 59
+{       
+
+
+
+
+
+
+
+     _stencil_val_o(c,0,0,0);            
+
+
+
+
+
+
+
+    
+    
+    if (j == 1) {
+
+
+
+
+_stencil_val_o(h.y,0,0,0);{ 
+      
+
+
+
+
+{     
+ _stencil_val_o(h.y,0,0,0); 
+_stencil_val_o(h.y,0,0,0);
+    
+     
+      
+#line 92
+}}   
+
+
+
+
+         
+
+
+
+
+      
+
+
+
+
+
+      
+      
+    
+#line 100
+}
+#line 109 "/home/mc462/basilisk/src/heights.h"
+    for (int i = 1; i <= 4; i++) { 
+_stencil_val_o(c,i*j,0,0); _stencil_val_o(cs.y,(i - 2)*j,0,0); 
+           
+  
+ 
+       
+         
+  
+ 
+        
+
+
+
+
+
+
+
+     
+   
+  
+   
+        
+        
+           
+        
+
+
+
+
+             
+#line 138 "/home/mc462/basilisk/src/heights.h"
+              
+              
+#line 156 "/home/mc462/basilisk/src/heights.h"
+      
+        
+    }
+
+
+
+
+
+    if (j == -1) {
+
+
+
+
+
+
+
+_stencil_val_o(c,0,0,0); _stencil_val_o(c,0,0,0);{
+ 
+{_stencil_val_a(h.y,0,0,0);  }
+{
+ {_stencil_val_a(h.y,0,0,0);  }
+
+
+
+
+
+ 
+{_stencil_val_a(h.y,0,0,0);        }}    
+      
+#line 183
+}
+
+
+
+
+
+
+
+                
+              
+      
+    
+#line 184
+}
+    else {
+#line 203
+{
+ {_stencil_val_a(h.y,0,0,0);  }
+ 
+{_stencil_val_a(h.y,0,0,0);        }}
+      
+#line 195 "/home/mc462/basilisk/src/heights.h"
+                
+   
+
+
+
+
+
+         
+      
+    
+
+
+}
+  }
+}
 #line 222 "/home/mc462/basilisk/src/heights.h"
 static void column_propagation (vector h)
 {
@@ -15020,93 +11644,23 @@ if (fabs(height(val(h.y,0,i,0))) <= 3.5 &&
 
 #line 230
 }
-#line 289 "/home/mc462/basilisk/src/heights.h"
-
-static void refine_h_x (Point point, scalar h)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-
-
-
-  bool complete = true;
-  {foreach_child() {
-    for (int i = -2; i <= 2; i++)
-      if (allocated(i,0,0) &&
-   !(!is_leaf(neighbor(i,0,0)) && !neighbor(i,0,0).neighbors && neighbor(i,0,0).pid >= 0) && !(neighbor(i,0,0).pid < 0) &&
-   fabs(height(val(h,i,0,0))) <= 3.5 &&
-   fabs(height(val(h,i,0,0)) + i) < fabs(height(val(h,0,0,0))))
- val(h,0,0,0) = val(h,i,0,0) + i;
-    if (val(h,0,0,0) == 1e30)
-      complete = false;
-  }end_foreach_child()}
-  if (complete)
-    return;
-#line 317 "/home/mc462/basilisk/src/heights.h"
-  int ori = orientation(val(h,0,0,0));
-
-  for (int i = -1; i <= 1; i++)
-    if (val(h,0,i,0) == 1e30 || orientation(val(h,0,i,0)) != ori)
-      return;
-
-  double h0 = (30.*height(val(h,0,0,0)) + height(val(h,0,1,0)) + height(val(h,0,-1,0)))/16.
-    + 20.*ori;
-  double dh = (height(val(h,0,1,0)) - height(val(h,0,-1,0)))/4.;
-  {foreach_child()
-    if (val(h,0,0,0) == 1e30)
-      val(h,0,0,0) = h0 + dh*child.y - child.x/2.;end_foreach_child()}
-#line 352 "/home/mc462/basilisk/src/heights.h"
-}
-
-#line 290
-static void refine_h_y (Point point, scalar h)
-{int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;
-
-
-
-
-  bool complete = true;
-  {foreach_child() {
-    for (int i = -2; i <= 2; i++)
-      if (allocated(0,i,0) &&
-   !(!is_leaf(neighbor(0,i,0)) && !neighbor(0,i,0).neighbors && neighbor(0,i,0).pid >= 0) && !(neighbor(0,i,0).pid < 0) &&
-   fabs(height(val(h,0,i,0))) <= 3.5 &&
-   fabs(height(val(h,0,i,0)) + i) < fabs(height(val(h,0,0,0))))
- val(h,0,0,0) = val(h,0,i,0) + i;
-    if (val(h,0,0,0) == 1e30)
-      complete = false;
-  }end_foreach_child()}
-  if (complete)
-    return;
-#line 317 "/home/mc462/basilisk/src/heights.h"
-  int ori = orientation(val(h,0,0,0));
-
-  for (int i = -1; i <= 1; i++)
-    if (val(h,i,0,0) == 1e30 || orientation(val(h,i,0,0)) != ori)
-      return;
-
-  double h0 = (30.*height(val(h,0,0,0)) + height(val(h,1,0,0)) + height(val(h,-1,0,0)))/16.
-    + 20.*ori;
-  double dh = (height(val(h,1,0,0)) - height(val(h,-1,0,0)))/4.;
-  {foreach_child()
-    if (val(h,0,0,0) == 1e30)
-      val(h,0,0,0) = h0 + dh*child.x - child.y/2.;end_foreach_child()}
-#line 352 "/home/mc462/basilisk/src/heights.h"
-}
-
-
-
-
-
-
+#line 239 "/home/mc462/basilisk/src/heights.h"
      
 void heights (scalar c, vector h)
-{tracing("heights","/home/mc462/basilisk/src/heights.h",360);
+{tracing("heights","/home/mc462/basilisk/src/heights.h",240);
+
+
+
+
+
+
+
   vector  s=new_vector("s");
   
     for (int i = 0; i < nboundary; i++)
       _attribute[s.x.i].boundary[i] = _attribute[c.i].boundary[i];
     
-#line 364
+#line 251
 for (int i = 0; i < nboundary; i++)
       _attribute[s.y.i].boundary[i] = _attribute[c.i].boundary[i];
 
@@ -15114,105 +11668,56 @@ for (int i = 0; i < nboundary; i++)
 
 
 
-  restriction (((scalar[]){c,{-1}}));
+
   for (int j = -1; j <= 1; j += 2) {
 
 
 
 
 
-    {foreach_level(0)
+    foreach_stencil()
       {
-        val(h.x,0,0,0) = 1e30;
+        {_stencil_val_a(s.x,0,0,0); _stencil_val(c,2*j,0,0); }
         
-#line 380
-val(h.y,0,0,0) = 1e30;}end_foreach_level();}
-
-    for (int l = 1; l <= depth(); l++) {
-
-
-
-
-      {foreach_level (l)
- {
-   val(s.x,0,0,0) = val(c,2*j,0,0);
-   
-#line 389
-val(s.y,0,0,0) = val(c,0,2*j,0);}end_foreach_level();}
-#line 399 "/home/mc462/basilisk/src/heights.h"
-      {foreach_level (l - 1)
- { {
-   val(s.x,0,0,0) = val(c,j,0,0);
-   val(s.x,j,0,0) = val(c,2*j,0,0);
-        } 
-#line 400
-{
-   val(s.y,0,0,0) = val(c,0,j,0);
-   val(s.y,0,j,0) = val(c,0,2*j,0);
-        }}end_foreach_level();}
+#line 267
+{_stencil_val_a(s.y,0,0,0); _stencil_val(c,0,2*j,0); }}end_foreach_stencil();
 
 
 
 
 
-
-      {foreach_halo (prolongation, l - 1)
- {
-   _attribute[c.i].prolongation (point, s.x);
-   
-#line 412
-_attribute[c.i].prolongation (point, s.y);}end_foreach_halo();}
-      { Boundary ** _i = boundaries, * _b; while (_i && (_b = *_i++)) if (_b->level) _b->level (_b, (scalar *)((vector[]){s,{{-1},{-1}}}), l); };
-
-
+    {
+#line 265
+foreach()
+      {
+        val(s.x,0,0,0) = val(c,2*j,0,0);
+        
+#line 267
+val(s.y,0,0,0) = val(c,0,2*j,0);}end_foreach();}
 
 
 
-      {foreach_level (l)
-        half_column (point, c, h, s, j);end_foreach_level();}
-    }
+
+
+    foreach_stencil ()
+      _stencil_half_column (point, c, h, s, j);end_foreach_stencil();
+
+
+
+
+
+    {
+#line 273
+foreach ()
+      half_column (point, c, h, s, j);end_foreach();}
   }
 
 
 
 
-
-
-   {
-    _attribute[h.x.i].prolongation = no_data;
-    _attribute[h.x.i].restriction = no_restriction;
-    _attribute[h.x.i].dirty = true;
-  } 
-#line 429
-{
-    _attribute[h.y.i].prolongation = no_data;
-    _attribute[h.y.i].restriction = no_restriction;
-    _attribute[h.y.i].dirty = true;
-  }
-
-
-
-
-  column_propagation (h);
-
-
-
-
-
-
-  
-    _attribute[h.x.i].prolongation = refine_h_x;
-    
-#line 446
-_attribute[h.y.i].prolongation = refine_h_y;delete((scalar*)((vector[]){s,{{-1},{-1}}}));
-end_tracing("heights","/home/mc462/basilisk/src/heights.h",447);}
-
-
-
-
-
-
-
+  column_propagation (h);delete((scalar*)((vector[]){s,{{-1},{-1}}}));
+end_tracing("heights","/home/mc462/basilisk/src/heights.h",281);}
+#line 455 "/home/mc462/basilisk/src/heights.h"
 
 #line 69 "/home/mc462/basilisk/src/curvature.h"
 
@@ -15974,18 +12479,7 @@ cstats curvature (scalar c, scalar kappa,
     double sigma, bool add)
 {tracing("curvature","/home/mc462/basilisk/src/curvature.h",541);
   int sh = 0, f = 0, sa = 0, sc = 0;
-
-
-
-
-
-
-  _attribute[kappa.i].refine = _attribute[kappa.i].prolongation = curvature_prolongation;
-  _attribute[kappa.i].restriction = curvature_restriction;
-
-
-
-
+#line 557 "/home/mc462/basilisk/src/curvature.h"
   vector ch = _attribute[c.i].height,   h=(ch).x.i>0?(ch):new_vector("h");
   if (!ch.x.i)
     heights (c, h);
@@ -16296,17 +12790,7 @@ _stencil_undefined
 void position (scalar f, scalar pos,
         coord G, coord Z, bool add)
 {
-
-
-
-
-
-
-  _attribute[pos.i].refine = _attribute[pos.i].prolongation = curvature_prolongation;
-  _attribute[pos.i].restriction = curvature_restriction;
-
-
-
+#line 749 "/home/mc462/basilisk/src/curvature.h"
   vector fh = _attribute[f.i].height,   h=(fh).x.i>0?(fh):new_vector("h");
   if (!fh.x.i)
     heights (f, h);
@@ -16380,7 +12864,7 @@ hp += (o.y + Delta*c.y - Z.y)*G.y;
 #line 19 "/home/mc462/basilisk/src/reduced.h"
 coord G = {0.,0.,0.}, Z = {0.,0.,0.};
 #line 30 "/home/mc462/basilisk/src/iforce.h"
-static int defaults_4_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
+static int defaults_3_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
 
 
 
@@ -16399,7 +12883,7 @@ static int defaults_4_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*t
 
 
 
-      static int defaults_4(const int i,const double t,Event *_ev){tracing("defaults_4","/home/mc462/basilisk/src/iforce.h",30); {
+      static int defaults_3(const int i,const double t,Event *_ev){tracing("defaults_3","/home/mc462/basilisk/src/iforce.h",30); {
   if (is_constant(a.x)) {
     a = new_face_vector("a");
     foreach_face_stencil(){_stencil_is_face_x(){ {
@@ -16440,7 +12924,7 @@ is_face_y(){ {
       dimensional (_const_a.y == Delta/sq(DT));
     }}end_is_face_y()}end_foreach_face_generic();}}
   }
-}{end_tracing("defaults_4","/home/mc462/basilisk/src/iforce.h",38);return 0;}end_tracing("defaults_4","/home/mc462/basilisk/src/iforce.h",38);}
+}{end_tracing("defaults_3","/home/mc462/basilisk/src/iforce.h",38);return 0;}end_tracing("defaults_3","/home/mc462/basilisk/src/iforce.h",38);}
 
 
 
@@ -16486,11 +12970,6 @@ static int acceleration_0_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double 
 foreach()
  val(f,0,0,0) = clamp (val(f,0,0,0), 0., 1.);end_foreach();}
     }}}
-#line 74 "/home/mc462/basilisk/src/iforce.h"
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar f=*_i;(&f)->i>=0;f=*++_i){ {
-    _attribute[f.i].prolongation = _attribute[p.i].prolongation;
-    _attribute[f.i].dirty = true;
-  }}}
 #line 88 "/home/mc462/basilisk/src/iforce.h"
   vector ia = a;
   foreach_face_stencil(){_stencil_is_face_x(){
@@ -16676,22 +13155,7 @@ is_face_y(){
 
  val(ia.y,0,0,0) += _const_alpha.y/(_const_fm.y + 0.)*phif*(val(f,0,0,0) - val(f,0,-1,0))/Delta;
       }}}}end_is_face_y()}end_foreach_face_generic();}}
-
-
-
-
-
-
-  {scalar*_i=(scalar*)( list);if(_i)for(scalar f=*_i;(&f)->i>=0;f=*++_i){ {
-    _attribute[f.i].prolongation = fraction_refine;
-    _attribute[f.i].dirty = true;
-  }}}
-
-
-
-
-
-
+#line 127 "/home/mc462/basilisk/src/iforce.h"
   {scalar*_i=(scalar*)( list);if(_i)for(scalar f=*_i;(&f)->i>=0;f=*++_i){ {
     scalar phi = _attribute[f.i].phi;
     delete (((scalar[]){phi,{-1}}));
@@ -16971,11 +13435,11 @@ tensor  tau_p={{{12},{13}},{{13},{14}}};
 static double _boundary4(Point point,Point neighbor,scalar _s,void *data){int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;{int ig=neighbor.i-point.i;if(ig==0)ig=_attribute[_s.i].d.x;NOT_UNUSED(ig);int jg=neighbor.j-point.j;if(jg==0)jg=_attribute[_s.i].d.y;NOT_UNUSED(jg);POINT_VARIABLES;{return( _neumann(0, point, neighbor, _s, data));}}}static double _boundary4_homogeneous(Point point,Point neighbor,scalar _s,void *data){int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;{int ig=neighbor.i-point.i;if(ig==0)ig=_attribute[_s.i].d.x;NOT_UNUSED(ig);int jg=neighbor.j-point.j;if(jg==0)jg=_attribute[_s.i].d.y;NOT_UNUSED(jg);POINT_VARIABLES;{return( _neumann_homogeneous(0, point, neighbor, _s, data));}}}
 static double _boundary5(Point point,Point neighbor,scalar _s,void *data){int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;{int ig=neighbor.i-point.i;if(ig==0)ig=_attribute[_s.i].d.x;NOT_UNUSED(ig);int jg=neighbor.j-point.j;if(jg==0)jg=_attribute[_s.i].d.y;NOT_UNUSED(jg);POINT_VARIABLES;{return( _neumann(0, point, neighbor, _s, data));}}}static double _boundary5_homogeneous(Point point,Point neighbor,scalar _s,void *data){int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;{int ig=neighbor.i-point.i;if(ig==0)ig=_attribute[_s.i].d.x;NOT_UNUSED(ig);int jg=neighbor.j-point.j;if(jg==0)jg=_attribute[_s.i].d.y;NOT_UNUSED(jg);POINT_VARIABLES;{return( _neumann_homogeneous(0, point, neighbor, _s, data));}}}
 #line 142
-static int defaults_5_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
+static int defaults_4_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i = 0)!=0;*ip=i;*tp=t;return ret;}
 
 
 #line 142
-      static int defaults_5(const int i,const double t,Event *_ev){tracing("defaults_5","/home/mc462/basilisk/src/log-conform.h",142); {
+      static int defaults_4(const int i,const double t,Event *_ev){tracing("defaults_4","/home/mc462/basilisk/src/log-conform.h",142); {
   if (is_constant (a.x))
     a = new_face_vector("a");
   if (f_s || f_r)
@@ -17031,7 +13495,7 @@ _attribute[s.i].dirty=1,_attribute[s.i].boundary[top]=_boundary5,_attribute[s.i]
 
 
 
-}{end_tracing("defaults_5","/home/mc462/basilisk/src/log-conform.h",175);return 0;}end_tracing("defaults_5","/home/mc462/basilisk/src/log-conform.h",175);}
+}{end_tracing("defaults_4","/home/mc462/basilisk/src/log-conform.h",175);return 0;}end_tracing("defaults_4","/home/mc462/basilisk/src/log-conform.h",175);}
 #line 186 "/home/mc462/basilisk/src/log-conform.h"
 typedef struct { double x, y;} pseudo_v;
 typedef struct { pseudo_v x, y;} pseudo_t;
@@ -19677,34 +16141,9 @@ foreach() {
         val(lambdav,0,0,0) = LAM*clamp(val(f,0,0,0),0,1);
     }end_foreach();}
 }{end_tracing("properties_1","drop.c",240);return 0;}end_tracing("properties_1","drop.c",240);}
-#line 258
-static int adapt_0_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i++)!=0;*ip=i;*tp=t;return ret;}
-#line 258 "drop.c"
-      static int adapt_0(const int i,const double t,Event *_ev){tracing("adapt_0","drop.c",258); {
-    adapt_wavelet (
-#line 259 "/home/mc462/basilisk/src/grid/tree-common.h"
-(
-#line 173
-scalar *
-#line 259
-)
-#line 259 "drop.c"
-((scalar[]){f,u.x,u.y,{-1}}), (double []){1.0e-2, 1.0e-3, 1.0e-3}, maxLevel, minLevel
-#line 176 "/home/mc462/basilisk/src/grid/tree-common.h"
-, 
-all
-#line 259 "drop.c"
-);
-}{end_tracing("adapt_0","drop.c",260);return 0;}end_tracing("adapt_0","drop.c",260);}
-
-
-
-static int logfile_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=( t <= simDuration)!=0;*ip=i;*tp=t;return ret;}static int logfile_expr1(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i += 1)!=0;*ip=i;*tp=t;return ret;}
-
-
-
-
 #line 264
+static int logfile_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=( t <= simDuration)!=0;*ip=i;*tp=t;return ret;}static int logfile_expr1(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i += 1)!=0;*ip=i;*tp=t;return ret;}
+#line 264 "drop.c"
       static int logfile(const int i,const double t,Event *_ev){tracing("logfile","drop.c",264); {
     scalar  pos=new_scalar("pos");
     position (f, pos,
@@ -19787,7 +16226,7 @@ datasize=19*sizeof(double);
 init_solver();
   {
 #line 24
-quadtree_methods();
+multigrid_methods();
 
     
 
@@ -19813,18 +16252,16 @@ event_register((Event){0,1,default_display,{default_display_expr0},((int *)0),((
 
 
 event_register((Event){0,1,init,{init_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/navier-stokes/centered.h",196,"init"});  
-#line 107 "/home/mc462/basilisk/src/vof.h"
-event_register((Event){0,1,defaults_1,{defaults_1_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/vof.h",107,"defaults"});  
-#line 127
-event_register((Event){0,1,defaults_2,{defaults_2_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/vof.h",127,"defaults"});  
+#line 127 "/home/mc462/basilisk/src/vof.h"
+event_register((Event){0,1,defaults_1,{defaults_1_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/vof.h",127,"defaults"});  
 #line 10 "/home/mc462/basilisk/src/two-phase-generic.h"
-event_register((Event){0,1,defaults_3,{defaults_3_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/two-phase-generic.h",10,"defaults"});  
+event_register((Event){0,1,defaults_2,{defaults_2_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/two-phase-generic.h",10,"defaults"});  
 #line 30 "/home/mc462/basilisk/src/iforce.h"
-event_register((Event){0,1,defaults_4,{defaults_4_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/iforce.h",30,"defaults"});  
+event_register((Event){0,1,defaults_3,{defaults_3_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/iforce.h",30,"defaults"});  
 #line 47 "/home/mc462/basilisk/src/contact.h"
 event_register((Event){0,1,init_0,{init_0_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/contact.h",47,"init"});  
 #line 142 "/home/mc462/basilisk/src/log-conform.h"
-event_register((Event){0,1,defaults_5,{defaults_5_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/log-conform.h",142,"defaults"});  
+event_register((Event){0,1,defaults_4,{defaults_4_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/log-conform.h",142,"defaults"});  
 #line 207 "drop.c"
 event_register((Event){0,1,init_1,{init_1_expr0},((int *)0),((double *)0),"drop.c",207,"init"});  
 #line 264
@@ -19897,16 +16334,6 @@ event_register((Event){0,1,acceleration,{acceleration_expr0},((int *)0),((double
 event_register((Event){0,1,projection,{projection_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/navier-stokes/centered.h",421,"projection"});  
 #line 436
 event_register((Event){0,1,end_timestep,{end_timestep_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/navier-stokes/centered.h",436,"end_timestep"});  
-
-
-
-
-
-
-
-
-
-event_register((Event){0,1,adapt,{adapt_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/navier-stokes/centered.h",446,"adapt"});  
 #line 140 "/home/mc462/basilisk/src/vof.h"
 event_register((Event){0,1,stability_0,{stability_0_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/vof.h",140,"stability"});  
 #line 380
@@ -19930,9 +16357,7 @@ event_register((Event){0,1,tracer_advection_1,{tracer_advection_1_expr0},((int *
 #line 521
 event_register((Event){0,1,acceleration_3,{acceleration_3_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/log-conform.h",521,"acceleration"});  
 #line 235 "drop.c"
-event_register((Event){0,1,properties_1,{properties_1_expr0},((int *)0),((double *)0),"drop.c",235,"properties"});  
-#line 258
-event_register((Event){0,1,adapt_0,{adapt_0_expr0},((int *)0),((double *)0),"drop.c",258,"adapt"});
+event_register((Event){0,1,properties_1,{properties_1_expr0},((int *)0),((double *)0),"drop.c",235,"properties"});
   
 #line 24 "ast/init_solver.h"
 }
