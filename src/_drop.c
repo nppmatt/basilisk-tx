@@ -15902,14 +15902,19 @@ extern int *__errno_location (void) __attribute__ ((__nothrow__ , __leaf__)) __a
 #line 40 "drop.c"
 
 
-#line 1 "/mmfs1/home/mc462/basilisk/src/ast/std/sys/stat.h"
+#line 1 "/mmfs1/home/mc462/basilisk/src/ast/std/stdbool.h"
+
+#line 1 "/mmfs1/home/mc462/basilisk/src/ast/std/stdbool.h"
+#include <stdbool.h>
+#line 43 "drop.c"
+
 
 #line 1 "/mmfs1/home/mc462/basilisk/src/ast/std/sys/stat.h"
 #include <sys/stat.h>
-#line 43 "drop.c"
+#line 46 "drop.c"
 #line 1 "/mmfs1/home/mc462/basilisk/src/ast/std/sys/types.h"
 #include <sys/types.h>
-#line 44 "drop.c"
+#line 47 "drop.c"
 
 
 
@@ -15975,17 +15980,17 @@ static void tomlError(const char* msg, const char* msg1)
     fprintf(ferr, "TOML PARSING ERROR: %s%s\n", msg, msg1?msg1:"");
     exit(1);
 }
-#line 166
+#line 169
 static double _boundary9(Point point,Point neighbor,scalar _s,void *data){int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;{int ig=neighbor.i-point.i;if(ig==0)ig=_attribute[_s.i].d.x;NOT_UNUSED(ig);int jg=neighbor.j-point.j;if(jg==0)jg=_attribute[_s.i].d.y;NOT_UNUSED(jg);POINT_VARIABLES;{return( (val(_s,0,0,0) == 1e30 ? 1e30 : val(_s,0,0,0) + (orientation(val(_s,0,0,0)) ? -1. : 1.)/tan(theta0*3.14159265358979/180.0)));}}}
 
 
-#line 110
+#line 113
 int main(int argc, char** argv)
 {
-#line 202
+#line 205
 _init_solver();
     
-#line 112
+#line 115
 FILE* configFile;
     char errbuf[256];
 
@@ -15994,9 +15999,9 @@ FILE* configFile;
     configFile = fopen(argv[1], "r");
     if (!configFile) {
         tomlError("Failed to open configuration - ", strerror(
-#line 119 "drop.c"
+#line 122 "drop.c"
                                                              (*__errno_location ())
-#line 119 "drop.c"
+#line 122 "drop.c"
                                                                   ));
     }
 
@@ -16067,25 +16072,25 @@ _attribute[h.y.i].dirty=1,_attribute[h.y.i].boundary[bottom]=_boundary9,_attribu
     double config_dt = (double)(toml_double_in(sim, "max-timestep")).u.d;
     DT = config_dt;
     simDuration = (double)(toml_double_in(sim, "duration")).u.d;
-#line 199 "drop.c"
+#line 202 "drop.c"
     init_grid (1 << maxLevel);
     run();
     printf("end main\n");
 free_solver();
 
-#line 202
+#line 205
 }
-#line 214
+#line 217
 static double _boundary10(Point point,Point neighbor,scalar _s,void *data){int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;{int ig=neighbor.i-point.i;if(ig==0)ig=_attribute[_s.i].d.x;NOT_UNUSED(ig);int jg=neighbor.j-point.j;if(jg==0)jg=_attribute[_s.i].d.y;NOT_UNUSED(jg);POINT_VARIABLES;{return( _dirichlet(0.0, point, neighbor, _s, data));}}}static double _boundary10_homogeneous(Point point,Point neighbor,scalar _s,void *data){int ig=0;NOT_UNUSED(ig);int jg=0;NOT_UNUSED(jg);POINT_VARIABLES;{int ig=neighbor.i-point.i;if(ig==0)ig=_attribute[_s.i].d.x;NOT_UNUSED(ig);int jg=neighbor.j-point.j;if(jg==0)jg=_attribute[_s.i].d.y;NOT_UNUSED(jg);POINT_VARIABLES;{return( _dirichlet_homogeneous(0.0, point, neighbor, _s, data));}}}
-#line 207
+#line 210
 static int init_1_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(t = 0)!=0;*ip=i;*tp=t;return ret;}
 
 
 
 
 
-#line 207
-      static int init_1(const int i,const double t,Event *_ev){tracing("init_1","drop.c",207);
+#line 210
+      static int init_1(const int i,const double t,Event *_ev){tracing("init_1","drop.c",210);
 {
 
 
@@ -16105,7 +16110,7 @@ _attribute[s.i].dirty=1,_attribute[s.i].boundary[bottom]=_boundary10,_attribute[
   
 #line 122
 vector) {0}, 0.
-#line 220 "drop.c"
+#line 223 "drop.c"
 );delete((scalar*)((scalar[]){phi,{-1}})); } while(0);
 
 
@@ -16114,37 +16119,33 @@ vector) {0}, 0.
 
 
     {
-#line 223
+#line 226
 foreach()
     val(u.y,0,0,0) = -val(f,0,0,0) * velocity;end_foreach();}
-}{end_tracing("init_1","drop.c",225);return 0;}end_tracing("init_1","drop.c",225);}
-
-
-
-
-
-
-
-
-
+}{end_tracing("init_1","drop.c",228);return 0;}end_tracing("init_1","drop.c",228);}
+#line 244
 static int properties_1_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i++)!=0;*ip=i;*tp=t;return ret;}
-#line 235 "drop.c"
-      static int properties_1(const int i,const double t,Event *_ev){tracing("properties_1","drop.c",235); {
+#line 244 "drop.c"
+      static int properties_1(const int i,const double t,Event *_ev){tracing("properties_1","drop.c",244); {
     foreach_stencil() {
+
         _stencil_val_a(mupv,0,0,0);_stencil_val(f,0,0,0);    
+
         _stencil_val_a(lambdav,0,0,0);_stencil_val(f,0,0,0);  
     }end_foreach_stencil();
     {
-#line 236
+#line 245
 foreach() {
+
         val(mupv,0,0,0) = 0.1*(1.0 - BETA)*clamp(val(f,0,0,0),0,1);
+
         val(lambdav,0,0,0) = LAM*clamp(val(f,0,0,0),0,1);
     }end_foreach();}
-}{end_tracing("properties_1","drop.c",240);return 0;}end_tracing("properties_1","drop.c",240);}
-#line 264
+}{end_tracing("properties_1","drop.c",251);return 0;}end_tracing("properties_1","drop.c",251);}
+#line 275
 static int logfile_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=( t <= simDuration)!=0;*ip=i;*tp=t;return ret;}static int logfile_expr1(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i += 1)!=0;*ip=i;*tp=t;return ret;}
-#line 264 "drop.c"
-      static int logfile(const int i,const double t,Event *_ev){tracing("logfile","drop.c",264); {
+#line 275 "drop.c"
+      static int logfile(const int i,const double t,Event *_ev){tracing("logfile","drop.c",275); {
     scalar  pos=new_scalar("pos");
     position (f, pos,
 #line 736 "/home/mc462/basilisk/src/curvature.h"
@@ -16152,14 +16153,14 @@ static int logfile_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;i
         
 #line 736
 coord) 
-#line 266 "drop.c"
+#line 277 "drop.c"
 {1,0}
 #line 736 "/home/mc462/basilisk/src/curvature.h"
 ,( coord) {0}, false
-#line 266 "drop.c"
+#line 277 "drop.c"
 );
     fprintf ( fout, "%.15f,%.15f,%.15f\n", t, statsf(pos).max, (statsf(pos).max)/R0 );delete((scalar*)((scalar[]){pos,{-1}}));
-}{end_tracing("logfile","drop.c",268);return 0;}end_tracing("logfile","drop.c",268);}
+}{end_tracing("logfile","drop.c",279);return 0;}end_tracing("logfile","drop.c",279);}
 
 
 
@@ -16167,22 +16168,22 @@ char *interfaceFile = NULL;
 char *movieFile = NULL;
 static int define_output_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(t = 0)!=0;*ip=i;*tp=t;return ret;}
 
-#line 274
-      static int define_output(const int i,const double t,Event *_ev){tracing("define_output","drop.c",274); {
+#line 285
+      static int define_output(const int i,const double t,Event *_ev){tracing("define_output","drop.c",285); {
     interfaceFile = (char *) pmalloc(sizeof(char) * 64,__func__,__FILE__,__LINE__);
     movieFile = (char *) pmalloc(sizeof(char) * 64,__func__,__FILE__,__LINE__);
-}{end_tracing("define_output","drop.c",277);return 0;}end_tracing("define_output","drop.c",277);}
+}{end_tracing("define_output","drop.c",288);return 0;}end_tracing("define_output","drop.c",288);}
 static int output_interface_expr0(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=( t <= simDuration)!=0;*ip=i;*tp=t;return ret;}static int output_interface_expr1(int *ip,double *tp,Event *_ev){int i=*ip;double t=*tp;int ret=(i += 50)!=0;*ip=i;*tp=t;return ret;}
 
-#line 278
-      static int output_interface(const int i,const double t,Event *_ev){tracing("output_interface","drop.c",278); {
+#line 289
+      static int output_interface(const int i,const double t,Event *_ev){tracing("output_interface","drop.c",289); {
     {
         sprintf(interfaceFile, "out/%s/%d.out", name, i);
         FILE * fp_interface = fopen (interfaceFile, "w");
         output_facets (f, fp_interface
 #line 510 "/home/mc462/basilisk/src/fractions.h"
 ,( vector) {{-1}}
-#line 282 "drop.c"
+#line 293 "drop.c"
 );
         fclose(fp_interface);
     }
@@ -16194,7 +16195,7 @@ static int output_interface_expr0(int *ip,double *tp,Event *_ev){int i=*ip;doubl
 #line 553 "/home/mc462/basilisk/src/output.h"
 , 
 NULL
-#line 289 "drop.c"
+#line 300 "drop.c"
 , 0, 1
 #line 555 "/home/mc462/basilisk/src/output.h"
 , 5, 
@@ -16210,11 +16211,11 @@ double[2][2]) {{X0, Y0}, {X0 + L0, Y0 + L0}},
 scalar) {-1}, 
 jet, 
 NULL
-#line 289 "drop.c"
+#line 300 "drop.c"
 );
     }
-#line 299 "drop.c"
-}{end_tracing("output_interface","drop.c",299);return 0;}end_tracing("output_interface","drop.c",299);}
+#line 310 "drop.c"
+}{end_tracing("output_interface","drop.c",310);return 0;}end_tracing("output_interface","drop.c",310);}
 #line 2 "ast/init_solver.h"
 
 static void _init_solver (void)
@@ -16262,10 +16263,10 @@ event_register((Event){0,1,defaults_3,{defaults_3_expr0},((int *)0),((double *)0
 event_register((Event){0,1,init_0,{init_0_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/contact.h",47,"init"});  
 #line 142 "/home/mc462/basilisk/src/log-conform.h"
 event_register((Event){0,1,defaults_4,{defaults_4_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/log-conform.h",142,"defaults"});  
-#line 207 "drop.c"
-event_register((Event){0,1,init_1,{init_1_expr0},((int *)0),((double *)0),"drop.c",207,"init"});  
-#line 264
-event_register((Event){0,2,logfile,{logfile_expr0,logfile_expr1},((int *)0),((double *)0),"drop.c",264,"logfile"});  
+#line 210 "drop.c"
+event_register((Event){0,1,init_1,{init_1_expr0},((int *)0),((double *)0),"drop.c",210,"init"});  
+#line 275
+event_register((Event){0,2,logfile,{logfile_expr0,logfile_expr1},((int *)0),((double *)0),"drop.c",275,"logfile"});  
 
 
 
@@ -16275,11 +16276,11 @@ event_register((Event){0,2,logfile,{logfile_expr0,logfile_expr1},((int *)0),((do
 
 
 
-event_register((Event){0,1,define_output,{define_output_expr0},((int *)0),((double *)0),"drop.c",274,"define_output"});  
+event_register((Event){0,1,define_output,{define_output_expr0},((int *)0),((double *)0),"drop.c",285,"define_output"});  
 
 
 
-event_register((Event){0,2,output_interface,{output_interface_expr0,output_interface_expr1},((int *)0),((double *)0),"drop.c",278,"output_interface"});
+event_register((Event){0,2,output_interface,{output_interface_expr0,output_interface_expr1},((int *)0),((double *)0),"drop.c",289,"output_interface"});
 	
 	
 	
@@ -16356,8 +16357,8 @@ event_register((Event){0,1,acceleration_2,{acceleration_2_expr0},((int *)0),((do
 event_register((Event){0,1,tracer_advection_1,{tracer_advection_1_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/log-conform.h",255,"tracer_advection"});  
 #line 521
 event_register((Event){0,1,acceleration_3,{acceleration_3_expr0},((int *)0),((double *)0),"/home/mc462/basilisk/src/log-conform.h",521,"acceleration"});  
-#line 235 "drop.c"
-event_register((Event){0,1,properties_1,{properties_1_expr0},((int *)0),((double *)0),"drop.c",235,"properties"});
+#line 244 "drop.c"
+event_register((Event){0,1,properties_1,{properties_1_expr0},((int *)0),((double *)0),"drop.c",244,"properties"});
   
 #line 24 "ast/init_solver.h"
 }

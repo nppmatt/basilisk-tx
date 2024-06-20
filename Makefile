@@ -35,13 +35,15 @@ run:
 
 .PHONY: clean
 clean:
-	rm $(SLURM_DIR)/*
-	rm -r $(OUT_DIR)/*
+	rm -f *.mp4
+	rm -f $(SLURM_DIR)/*
+	rm -rf $(OUT_DIR)/*
 
 .PHONY: deepclean
 deepclean:
-	rm $(OBJ_DIR)/*
-	rm $(BIN_DIR)/*
-	rm $(SLURM_DIR)/*
-	rm -r $(OUT_DIR)/*
+	rm -f *.mp4
+	rm -f $(SLURM_DIR)/*
+	rm -rf $(OUT_DIR)/*
+	rm -f $(OBJ_DIR)/*
+	rm -f $(BIN_DIR)/*
 

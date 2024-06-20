@@ -38,6 +38,9 @@ Note that small contact angles are not accessible yet (/src/contact.h).
 #include "include/toml.h"
 #include <errno.h>
 
+/* Runtime Newtonian check. */
+#include <stdbool.h>
+
 /* Directory creation. */
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -232,10 +235,18 @@ event acceleration (i++) {
     av.y[] -= 9.81;
 }
 */
+
+/* Update viscoelastic quantities for fluids.
+ * Branching is generally not preferred in a loop,
+ * but we are assuming that only one path is taken in the program
+ * and the branch predictor will take care of the rest.
+ */
 event properties (i++) {
     foreach() {
-        mupv[] = 0.1*(1.0 - BETA)*clamp(f[],0,1);  // Polymeric viscosity of the drop
-        lambdav[] = LAM*clamp(f[],0,1);           // Relaxation time of the drop
+        /* Apply polymeric viscosity of the drop. */
+        mupv[] = 0.1*(1.0 - BETA)*clamp(f[],0,1);
+        /* Apply relaxation time of drop. */
+        lambdav[] = LAM*clamp(f[],0,1);
     }
 }
 
