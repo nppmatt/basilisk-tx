@@ -23,7 +23,6 @@ toml: $(INC_DIR)/toml.h $(INC_DIR)/toml.c
 drop: $(SRC_DIR)/drop.c $(OBJ_DIR)/toml.o
 	rm $(SRC_DIR)/_$@.c
 	$(MPIGEN) $@.c
-	$(LMOD); wait && \
 	$(MPICC) $(MPIFLAGS) -I$(INC_DIR) -c $(SRC_DIR)/_$@.c -o $(OBJ_DIR)/$@.o
 	$(MPICC) $(MPIFLAGS) -I$(INC_DIR) $(OBJ_DIR)/toml.o $(OBJ_DIR)/$@.o \
 		-o $(BIN_DIR)/$@ $(LINKFLAGS)
