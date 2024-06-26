@@ -1,16 +1,16 @@
 # 2024-05-20 Prototype config/template for automating experiment parameter input.
 # Intended to be used with drop.c, will probably move materials into another config.
-name = "water-acry"
-description = "Water droplet falling on an acrylic (PMMA) surface."
+name = "speed-8.0"
+description = "Wax droplet falling on acrylic (PMMA) surface."
 
 # Properties of the two fluids.
 # rho: density (kg/m^3)
 # mu: viscosity (Pa*s)
 # sigma: viscoelastic stress tensor constant (N/m)
 [liquid]
-    rho = 997.0
-    mu = 0.0009
-    sigma = 0.072
+    rho = 800.0
+    mu = 0.04
+    sigma = 0.027
 
 [gas]
     rho = 1.20
@@ -24,19 +24,19 @@ description = "Water droplet falling on an acrylic (PMMA) surface."
 #   i.e. 0.2 starts the drop "20% above the floor" relative to the max height.
 [drop]
     radius = 0.0025
-    velocity = 3.0
-    contact-angle = 80.0
+    velocity = 8.0
+    contact-angle = 70.0
     init-height = 0.15
 
 # Simulation parameters.
 # max-timestep: In seconds. Constrains solver adaptivity in temporal domain.
 # duration: Total time to simulate, in seconds.
 [sim]
-    beta = 0.0
+    beta = 1.0
     lam = 0.0
-    level = 11
-    max-timestep = 1.0e-5
+    level = 10
+    max-timestep = 1.0e-4
     duration = 0.5
     num-cpus = 64
-    max-compute-time = "12:00:00"
+    max-compute-time = "2:00:00"
 

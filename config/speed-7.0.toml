@@ -1,7 +1,7 @@
 # 2024-05-20 Prototype config/template for automating experiment parameter input.
 # Intended to be used with drop.c, will probably move materials into another config.
-name = "speed"
-description = "Wax droplet falling on acrylic (PMMA) surface, fast."
+name = "speed-7.0"
+description = "Wax droplet falling on acrylic (PMMA) surface."
 
 # Properties of the two fluids.
 # rho: density (kg/m^3)
@@ -24,7 +24,7 @@ description = "Wax droplet falling on acrylic (PMMA) surface, fast."
 #   i.e. 0.2 starts the drop "20% above the floor" relative to the max height.
 [drop]
     radius = 0.0025
-    velocity = 30.0
+    velocity = 7.0
     contact-angle = 70.0
     init-height = 0.15
 
@@ -34,7 +34,7 @@ description = "Wax droplet falling on acrylic (PMMA) surface, fast."
 [sim]
     beta = 1.0
     lam = 0.0
-    level = 8
+    level = 10
     max-timestep = 1.0e-4
     duration = 0.5
     num-cpus = 64
